@@ -35,3 +35,6 @@ go.work.sum
 
 # Compiled Binary folder
 bin
+
+# Generated gRPC Stubs
+*.pb.go
