@@ -13,4 +13,3 @@ proto:
 clean:
     find ./proto -name "*.pb.go" -type f -delete
 
-up:

@@ -6,9 +6,9 @@ import (
 )
 
 func main() {
-	log.Printf("We are live!")
 
 	for {
+		log.Printf("We are live!")
 		time.Sleep(time.Second * 10)
 	}
 
