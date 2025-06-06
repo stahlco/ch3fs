@@ -1,6 +1,7 @@
 ### Overview
 Distributed P2P Storage System for Recipes. This represents the Group-work of Cedric Borchardt, Johannes Duschl 
 and Constantin Stahl for the TU Berlin Scalability Engineering 2025 coding task.
+
 ---
 ### Setup
 
