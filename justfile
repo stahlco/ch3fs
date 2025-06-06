@@ -1,8 +1,8 @@
 build:
-	@go build -o bin/lc
+	@go build -o bin/chefs
 
 run: build
-	@./bin/lc
+	@./bin/chefs
 
 proto:
     protoc --proto_path=./proto \
@@ -12,3 +12,5 @@ proto:
 
 clean:
     find ./proto -name "*.pb.go" -type f -delete
+
+up:

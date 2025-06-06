@@ -1,4 +1,15 @@
-FROM ubuntu:latest
-LABEL authors="stahlco"
+FROM golang:alpine AS build
 
-ENTRYPOINT ["top", "-b"]
+RUN apk add git
+
+WORKDIR /app
+COPY . .
+
+RUN go build -o /bin/chefs
+
+FROM alpine:3.19
+WORKDIR /app
+
+COPY --from=build /bin/chefs  .
+
+CMD ["./chefs"]
