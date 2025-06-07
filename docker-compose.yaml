@@ -1,0 +1,18 @@
+services:
+  ch3f:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - docker/.env
+    networks:
+      - kitchen
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+
+networks:
+  kitchen:
+    name: kitchen

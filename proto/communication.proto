@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/stahlco/ch3fs/proto/communication";
+
+service Functions {
+  rpc DummyTest (DummyReq) returns (DummyResp);
+  //rpc PostFile(File) returns (PostResponse);
+  //rpc GetFile(FileName) returns (File);
+}
+
+message DummyReq {
+  string msg = 1;
+}
+
+message DummyResp {
+  string msg = 1;
+}

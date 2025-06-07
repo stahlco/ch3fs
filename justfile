@@ -5,6 +5,7 @@ run: build
 	@./bin/chefs
 
 proto:
+    echo "Generating the .proto files"
     protoc --proto_path=./proto \
       --go_out=./proto --go_opt=paths=source_relative \
       --go-grpc_out=./proto --go-grpc_opt=paths=source_relative \
@@ -12,4 +13,12 @@ proto:
 
 clean:
     find ./proto -name "*.pb.go" -type f -delete
+
+# Spins up the containers
+up:
+   docker compose up --build --detach --timeout 3
+
+# Shuts down the containers (remove-orphans = Removes any containers created by a previous run, )
+down:
+    docker compose down --remove-orphans --timeout 3
 

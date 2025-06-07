@@ -5,4 +5,4 @@ COPY . .
 
 RUN go build -o /bin/chefs
 
-CMD ["./chefs"]
+CMD ["/bin/chefs"]
