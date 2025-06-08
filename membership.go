@@ -44,7 +44,7 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 			}
 		}
 		// Pseudo-random value in between [0,backoff * 0,1) <= 500ms
-		backoff = math.Max(backoff*2, CAP)
+		backoff = math.Min(backoff*2, CAP)
 		jitter := rand.Float64() * float64(rand.Intn(int(backoff*0.1)))
 		time.Sleep(time.Millisecond * time.Duration(backoff+jitter))
 	}
