@@ -44,14 +44,14 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 			}
 		}
 		backoff = math.Min(backoff*2, CAP)
-		jitter := rand.Float64() * float64(rand.Intn(int(backoff*0.1))) * jitterDirection() //-500ms < ]-(backoff * 0,1),backoff * 0,1[ < 500ms
+		jitter := rand.Float64() * float64(rand.Intn(int(backoff*0.1))) * jitterSign() //-500ms < ]-(backoff * 0,1),backoff * 0,1[ < 500ms
 		time.Sleep(time.Millisecond * time.Duration(backoff+jitter))
 	}
 }
 
-// jitterDirection defines if the jitter value is negative or positive,
-// to get a wider distribution of the backoff interval
-func jitterDirection() float64 {
+// jitterSign randomly returns either -1.0 or +1.0,
+// This is used to apply positive or negative jitter.
+func jitterSign() float64 {
 	random := rand.Intn(2)
 	if random == 0 {
 		return -1.0
