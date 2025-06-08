@@ -10,6 +10,7 @@ proto:
       --go_out=./proto --go_opt=paths=source_relative \
       --go-grpc_out=./proto --go-grpc_opt=paths=source_relative \
       $(find ./proto -name "*.proto")
+    go mod tidy
 
 clean:
     find ./proto -name "*.pb.go" -type f -delete
