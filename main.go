@@ -14,7 +14,7 @@ func main() {
 	//Background routine which prints the memberlist
 	go func() {
 		for {
-			log.Printf("[INFO] Current Memberlist: %v", list.Members()) //list.Members() can be used for broadcasting changes!
+			log.Printf("[INFO] Current Memberlist: %v", list.Members()) //might useful for consensus algorithms
 			time.Sleep(time.Second * 20)
 		}
 	}()

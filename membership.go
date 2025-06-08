@@ -49,6 +49,8 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 	}
 }
 
+// jitterDirection defines if the jitter value is negative or positive,
+// to get a wider distribution of the backoff interval
 func jitterDirection() float64 {
 	random := rand.Intn(2)
 	if random == 0 {
