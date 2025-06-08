@@ -2,12 +2,15 @@ package main
 
 import (
 	"log"
+	"math"
 	"math/rand"
 	"net"
 	"time"
 )
 
 import "github.com/hashicorp/memberlist"
+
+const CAP = 5000.0
 
 func main() {
 
@@ -36,8 +39,8 @@ func main() {
 			}
 		}
 		// Random pseudo-random value in between [0,3)
-		backoff *= 2
-		jitter := rand.Float64() * float64(rand.Intn(3))
+		backoff = math.Max(backoff*2, CAP)
+		jitter := rand.Float64() * float64(rand.Intn(int(backoff*0.1)))
 		time.Sleep(time.Millisecond * time.Duration(backoff+jitter))
 	}
 
