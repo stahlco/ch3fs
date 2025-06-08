@@ -30,8 +30,8 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 
 	// Joining the cluster
 	for {
-		//Docker's Internal DNS Service - returns all healthy containers in the 'Docker' network
-		peerIPs, err := net.LookupHost("ch3f") //ch3fs-ch3f-x and x <= n
+		//Docker's Internal DNS Service - returns IPs of all healthy containers in the 'ch3fs' network
+		peerIPs, err := net.LookupHost("ch3f")
 		if err != nil {
 			log.Fatalf("Look up of host in 'ch3fs' failed, with Error: %v", err)
 			return nil, err
