@@ -48,6 +48,8 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 	}
 }
 
+// BackoffWithJitter calculates a random jittered backoff value
+// Is public, so that remote functions can access it.
 func BackoffWithJitter(backoff float64) float64 {
 	backoff = math.Min(backoff*2, CAP)
 	return rand.Float64() * backoff
