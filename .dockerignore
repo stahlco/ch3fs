@@ -1,0 +1,11 @@
+.git/
+.idea/
+docker/
+target/
+valkey_conf/
+.dockerignore
+*.env*
+.gitignore
+docker-compose.yaml
+justfile
+.DS_Store
