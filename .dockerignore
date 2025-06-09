@@ -1,7 +1,6 @@
 .git/
 .idea/
 docker/
-target/
 valkey_conf/
 .dockerignore
 *.env*
