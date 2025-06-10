@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"net"
+	"os"
 	"time"
 )
 
@@ -46,6 +48,21 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 		backoff = BackoffWithJitter(backoff)
 		time.Sleep(time.Duration(backoff) * time.Millisecond)
 	}
+}
+
+func FetchSystemMembers(list *memberlist.Memberlist) ([]*memberlist.Node, error) {
+	host, _ := os.Hostname()
+	if len(list.Members()) <= 0 {
+		return nil, fmt.Errorf("memberlist is empty")
+	}
+	var members []*memberlist.Node
+	for _, member := range list.Members() {
+		if member.Name == host {
+			continue
+		}
+		members = append(members, member)
+	}
+	return members, nil
 }
 
 // BackoffWithJitter calculates a random jittered backoff value

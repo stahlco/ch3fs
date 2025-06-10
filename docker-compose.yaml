@@ -9,7 +9,7 @@ services:
     networks:
       - kitchen
     deploy:
-      replicas: 5
+      replicas: 10
       restart_policy:
         condition: on-failure
 

@@ -11,6 +11,8 @@ func main() {
 		log.Fatalf("Setting up the membership in the cluster failed with Error: %v", err)
 	}
 
+	//node := NewNode(list)
+
 	//Background routine which prints the memberlist
 	go func() {
 		for {
