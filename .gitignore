@@ -31,7 +31,7 @@ go.work.sum
 # .idea/
 # .vscode/
 
-.DS-Store
+.DS_Store
 
 # Compiled Binary folder
 bin
