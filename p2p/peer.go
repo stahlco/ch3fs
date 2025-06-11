@@ -15,8 +15,10 @@ type Peer struct {
 	Node *memberlist.Node
 
 	//client *grpc.ClientConn
-	Server         *grpc.Server
-	Service        *FunctionServer
+	Server  *grpc.Server
+	Service *FunctionServer
+
+	Host           string
 	GrpcPort       int
 	MemberlistPort int
 
@@ -27,16 +29,23 @@ type Peer struct {
 	Store *storage.Store
 }
 
-func NewPeer(list *memberlist.Memberlist, store *storage.Store, grpcPort int) *Peer {
+func NewPeer(list *memberlist.Memberlist, store *storage.Store) *Peer {
 	s := grpc.NewServer()
 	service := &FunctionServer{}
 	pb.RegisterFunctionsServer(s, service)
+
+	// Returns 172.0. ... :7946 but we want 8080
+	addr := list.LocalNode().Address()
+
+	// Splits the IP in Host and PORT for us only relevant is the Host
+	host, _, _ := net.SplitHostPort(addr)
 
 	return &Peer{
 		Node:           list.LocalNode(),
 		Server:         s,
 		Service:        service,
-		GrpcPort:       grpcPort,
+		Host:           host,
+		GrpcPort:       8080,
 		MemberlistPort: 7946,
 		Peers:          list,
 		Store:          store,
@@ -44,18 +53,16 @@ func NewPeer(list *memberlist.Memberlist, store *storage.Store, grpcPort int) *P
 }
 
 func (p *Peer) Start() error {
-	addr := p.Node.Address()
-	host, _, err := net.SplitHostPort(addr)
 
-	grpcAddr := fmt.Sprintf("%s:%d", host, p.GrpcPort)
+	grpcAddr := fmt.Sprintf("%s:%d", p.Host, p.GrpcPort)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatalf("Not able to listen on Addr: %v", addr)
+		log.Fatalf("Not able to listen on Addr: %v", p.Node.Address())
 		return err
 	}
 
-	log.Printf("Successfully started the Server on Addr: %s", addr)
+	log.Printf("Successfully started the Server on Addr: %s", p.Node.Address())
 
 	return p.Server.Serve(lis)
 }

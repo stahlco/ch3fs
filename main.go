@@ -13,7 +13,7 @@ func main() {
 		log.Fatalf("Setting up the membership in the cluster failed with Error: %v", err)
 	}
 
-	peer := p2p.NewPeer(list, storage.NewStore(), 8080)
+	peer := p2p.NewPeer(list, storage.NewStore())
 	go peer.Start()
 	if err != nil {
 		log.Fatalf("Error occured while starting the gRPC Server on Peer: %v with Error: %v", peer, err)
