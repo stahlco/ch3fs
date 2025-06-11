@@ -15,10 +15,8 @@ func main() {
 
 	peer := p2p.NewPeer(list, storage.NewStore())
 	go peer.Start()
-	if err != nil {
-		log.Fatalf("Error occured while starting the gRPC Server on Peer: %v with Error: %v", peer, err)
-	}
 
+	// TestDummy: Testing the Functionality of the DummyFunction service!
 	go TestDummy(list)
 
 	//Background routine which prints the memberlist

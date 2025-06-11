@@ -2,6 +2,7 @@ package main
 
 import (
 	"ch3fs/p2p"
+	pb "ch3fs/proto"
 	"fmt"
 	"github.com/hashicorp/memberlist"
 	"log"
@@ -29,6 +30,7 @@ func TestDummy(list *memberlist.Memberlist) {
 		}
 
 		msg := fmt.Sprintf("Hello from %v", list.LocalNode())
-		p2p.SendDummyRequest(target, msg)
+		req := pb.DummyReq{Msg: msg}
+		p2p.SendDummyRequest(target, &req)
 	}
 }
