@@ -1,6 +1,8 @@
 package main
 
 import (
+	"ch3fs/p2p"
+	"ch3fs/storage"
 	"log"
 	"time"
 )
@@ -11,7 +13,13 @@ func main() {
 		log.Fatalf("Setting up the membership in the cluster failed with Error: %v", err)
 	}
 
-	//node := NewNode(list)
+	peer := p2p.NewPeer(list, storage.NewStore(), 8080)
+	go peer.Start()
+	if err != nil {
+		log.Fatalf("Error occured while starting the gRPC Server on Peer: %v with Error: %v", peer, err)
+	}
+
+	go TestDummy(list)
 
 	//Background routine which prints the memberlist
 	go func() {

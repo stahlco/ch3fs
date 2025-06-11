@@ -1,4 +1,4 @@
-package network
+package p2p
 
 import (
 	commpb "ch3fs/proto"
@@ -12,29 +12,23 @@ import (
 type Client struct {
 }
 
-type dummyRequest struct {
+type DummyRequest struct {
 	msg string
 }
 
-func sendDummyRequest(request string) {
+func SendDummyRequest(target string, request string) {
 	log.Println("preparing connection...")
 
-	target := "localhost:8080" //random container
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return
 	}
-	defer func(conn *grpc.ClientConn) {
-		err := conn.Close()
-		if err != nil {
-			log.Println("error closing the connection:", err)
-		}
-	}(conn)
+	defer conn.Close()
 
 	client := commpb.NewFunctionsClient(conn)
 	req := &commpb.DummyReq{Msg: request}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	res, err := client.DummyTest(ctx, req)
@@ -42,5 +36,5 @@ func sendDummyRequest(request string) {
 		log.Println("Error from server", err)
 		return
 	}
-	log.Printf("successfully sent request, response: %s \n", res)
+	log.Printf("Successfully sent request, response: %s \n", res)
 }

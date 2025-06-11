@@ -4,8 +4,6 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     restart: unless-stopped
-    env_file:
-      - docker/.env
     networks:
       - kitchen
     deploy:
