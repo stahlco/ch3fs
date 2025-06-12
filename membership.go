@@ -1,18 +1,15 @@
 package main
 
 import (
+	"ch3fs/p2p"
 	"fmt"
 	"log"
-	"math"
-	"math/rand"
 	"net"
 	"os"
 	"time"
 )
 
 import "github.com/hashicorp/memberlist"
-
-const CAP = 5000.0
 
 // DiscoverAndJoinPeers creates a new memberlist node using the default LAN config,
 // discovers peers via DNS lookup ("ch3f"), and attempts to join them.
@@ -45,7 +42,7 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 				return list, nil
 			}
 		}
-		backoff = BackoffWithJitter(backoff)
+		backoff = p2p.BackoffWithJitter(backoff)
 		time.Sleep(time.Duration(backoff) * time.Millisecond)
 	}
 }
@@ -63,11 +60,4 @@ func FetchSystemMembers(list *memberlist.Memberlist) ([]*memberlist.Node, error)
 		members = append(members, member)
 	}
 	return members, nil
-}
-
-// BackoffWithJitter calculates a random jittered backoff value
-// Is public, so that remote functions can access it.
-func BackoffWithJitter(backoff float64) float64 {
-	backoff = math.Min(backoff*2, CAP)
-	return rand.Float64() * backoff
 }

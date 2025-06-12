@@ -8,9 +8,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
 	"log"
+	"math"
+	"math/rand"
 	"os"
 	"time"
 )
+
+const CAP = 5000.0
 
 type FileServer struct {
 	pb.FileSystemServer
@@ -38,61 +42,56 @@ func (fs FileServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*
 }
 
 func (fs FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
+	// Checking the Context for cancellation
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
-	// Fetching Data from Request
-	filename, content := deconstructRecipeUploadRequest(req)
-	recipeUuid, _ := uuid.Parse(req.GetId())
-	recipe := storage.NewRecipe(recipeUuid, filename, content)
+	if req == nil {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("request cannot be nil")
+	}
 
 	// Checks before accessing the Database or/and Broadcasting
 	if len(req.GetSeen()) >= 3 {
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("Has enough Replicas!")
 	}
 
-	// Writing to the Database asynchronous
-	errChan := make(chan error)
-	go func() {
-		errChan <- fs.Store.StoreRecipe(ctx, recipe)
-	}()
-
-	err := <-errChan
+	// Extract and validate data from request
+	filename, content := deconstructRecipeUploadRequest(req)
+	if filename == "" {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("filename cannot be empty")
+	}
+	recipeUuid, err := uuid.Parse(req.GetId())
 	if err != nil {
-		resp := pb.UploadResponse{
-			Success: false,
-		}
-		log.Fatalf("Failed to store the file: %s with Eroor: %v", filename, err)
-		return &resp, err
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("invalid recipe ID: %w", err)
 	}
 
-	broadcastChan := make(chan *pb.UploadResponse)
-	go func() {
-		broadcastResponse, err := fs.BroadcastUploadRequest(req)
-		if err != nil {
-			log.Fatalf("Not able to broadcast the msg!")
-		}
+	recipe := storage.NewRecipe(recipeUuid, filename, content)
 
-		broadcastChan <- broadcastResponse
+	// Writing to the Database synchronously
+	if err := fs.Store.StoreRecipe(ctx, recipe); err != nil {
+		log.Printf("Failed to store recipe %s: %v", filename, err)
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("failed to store recipe: %w", err)
+	}
+
+	// Broadcasting asynchronously
+	go func() {
+		broadcastCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if resp, err := fs.BroadcastUploadRequest(broadcastCtx, req); err != nil || resp.Success == false {
+			log.Printf("Failed to broadcast upload request for recipe %s: %v", filename, err)
+
+		}
 	}()
 
-	resp := pb.UploadResponse{
-		Success: true,
-	}
-	return &resp, err
+	return &pb.UploadResponse{Success: true}, err
 
 }
 
-func (fs FileServer) BroadcastUploadRequest(oldReq *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
-	req := fs.createBroadcastRequest(oldReq)
-
-	broadcastCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
+func (fs FileServer) BroadcastUploadRequest(ctx context.Context, oldReq *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
 	//TODO
+	return nil, nil
 }
 
 func (fs FileServer) createBroadcastRequest(oldReq *pb.RecipeUploadRequest) *pb.RecipeUploadRequest {
@@ -106,4 +105,11 @@ func (fs FileServer) createBroadcastRequest(oldReq *pb.RecipeUploadRequest) *pb.
 
 func deconstructRecipeUploadRequest(req *pb.RecipeUploadRequest) (string, string) {
 	return req.GetFilename(), string(req.GetContent())
+}
+
+// BackoffWithJitter calculates a random jittered backoff value
+// Is public, so that remote functions can access it.
+func BackoffWithJitter(backoff float64) float64 {
+	backoff = math.Min(backoff*2, CAP)
+	return rand.Float64() * backoff
 }
