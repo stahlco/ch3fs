@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option go_package = "github.com/stahlco/ch3fs/proto/communication";
 
-service Ch3fsFileSystem {
+service FileSystem {
   // Dummy Function ≈ echo + "Receiver Server"
   rpc DummyTest (DummyTestRequest) returns (DummyTestResponse);
 

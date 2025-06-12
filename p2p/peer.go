@@ -32,7 +32,7 @@ type Peer struct {
 func NewPeer(list *memberlist.Memberlist, store *storage.Store) *Peer {
 	s := grpc.NewServer()
 	service := &FunctionServer{}
-	pb.RegisterFunctionsServer(s, service)
+	pb.RegisterFileSystemServer(s, service)
 
 	// Returns 172.0. ... :7946 but we want 8080
 	addr := list.LocalNode().Address()

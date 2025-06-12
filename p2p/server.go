@@ -8,12 +8,12 @@ import (
 )
 
 type FunctionServer struct {
-	pb.FunctionsServer
+	pb.FileSystemServer
 }
 
-func (s FunctionServer) DummyTest(ctx context.Context, req *pb.DummyReq) (*pb.DummyResp, error) {
+func (s FunctionServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*pb.DummyTestResponse, error) {
 	hn, _ := os.Hostname()
 	// do smth
-	resp := pb.DummyResp{Msg: fmt.Sprintf("%s and I am Server: %s, ", req.GetMsg(), hn)}
+	resp := pb.DummyTestResponse{Msg: fmt.Sprintf("%s and I am Server: %s, ", req.GetMsg(), hn)}
 	return &resp, nil
 }

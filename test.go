@@ -30,7 +30,7 @@ func TestDummy(list *memberlist.Memberlist) {
 		}
 
 		msg := fmt.Sprintf("Hello from %v", list.LocalNode())
-		req := pb.DummyReq{Msg: msg}
+		req := pb.DummyTestRequest{Msg: msg}
 		p2p.SendDummyRequest(target, &req)
 	}
 }

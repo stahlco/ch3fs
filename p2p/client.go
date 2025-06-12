@@ -16,7 +16,7 @@ type DummyRequest struct {
 	msg string
 }
 
-func SendDummyRequest(target string, request *pb.DummyReq) {
+func SendDummyRequest(target string, request *pb.DummyTestRequest) {
 	log.Println("preparing connection...")
 
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -25,7 +25,7 @@ func SendDummyRequest(target string, request *pb.DummyReq) {
 	}
 	defer conn.Close()
 
-	client := pb.NewFunctionsClient(conn)
+	client := pb.NewFileSystemClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
