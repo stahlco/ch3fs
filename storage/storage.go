@@ -37,12 +37,12 @@ func NewRecipe(filename string, content string) *Recipe {
 	}
 }
 
-func (s *Store) StoreRecipe(recipe *Recipe) error {
-
-	return s.Database.Update(func(tx *bbolt.Tx) error {
+func (s *Store) StoreRecipe(recipe *Recipe) (uint64, error) {
+	var id uint64
+	return id, s.Database.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte("recipes"))
 
-		id, _ := b.NextSequence()
+		id, _ = b.NextSequence()
 		recipe.RecipeId = int(id)
 
 		content, err := json.Marshal(recipe)

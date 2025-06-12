@@ -29,8 +29,8 @@ message DummyTestResponse {
 }
 
 message RecipeUploadRequest {
-  string filename = 2;
-  bytes content = 3;
+  string filename = 1;
+  bytes content = 2;
 }
 
 message UploadResponse {

@@ -2,7 +2,6 @@ package p2p
 
 import (
 	pb "ch3fs/proto"
-	"ch3fs/storage"
 	"fmt"
 	"github.com/hashicorp/memberlist"
 	"google.golang.org/grpc"
@@ -16,7 +15,7 @@ type Peer struct {
 
 	//client *grpc.ClientConn
 	Server  *grpc.Server
-	Service *FunctionServer
+	Service *FileServer
 
 	Host           string
 	GrpcPort       int
@@ -24,14 +23,11 @@ type Peer struct {
 
 	//Information about the system
 	Peers *memberlist.Memberlist
-
-	// Data Storage Components
-	Store *storage.Store
 }
 
-func NewPeer(list *memberlist.Memberlist, store *storage.Store) *Peer {
+func NewPeer(list *memberlist.Memberlist) *Peer {
 	s := grpc.NewServer()
-	service := &FunctionServer{}
+	service := &FileServer{}
 	pb.RegisterFileSystemServer(s, service)
 
 	// Returns 172.0. ... :7946 but we want 8080
@@ -48,7 +44,6 @@ func NewPeer(list *memberlist.Memberlist, store *storage.Store) *Peer {
 		GrpcPort:       8080,
 		MemberlistPort: 7946,
 		Peers:          list,
-		Store:          store,
 	}
 }
 

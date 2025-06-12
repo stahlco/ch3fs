@@ -2,7 +2,6 @@ package main
 
 import (
 	"ch3fs/p2p"
-	"ch3fs/storage"
 	"log"
 	"time"
 )
@@ -13,7 +12,7 @@ func main() {
 		log.Fatalf("Setting up the membership in the cluster failed with Error: %v", err)
 	}
 
-	peer := p2p.NewPeer(list, storage.NewStore())
+	peer := p2p.NewPeer(list)
 	go peer.Start()
 
 	// TestDummy: Testing the Functionality of the DummyFunction service!
