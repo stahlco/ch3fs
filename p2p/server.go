@@ -5,6 +5,7 @@ import (
 	"ch3fs/storage"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"log"
 	"os"
 )
@@ -41,20 +42,20 @@ func (fs FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadReque
 	}
 
 	filename, content := deconstructRecipeUploadRequest(req)
-	recipe := storage.NewRecipe(filename, content)
+	recipeUuid, _ := uuid.Parse(req.GetId())
+	recipe := storage.NewRecipe(recipeUuid, filename, content)
 
-	id, err := fs.Store.StoreRecipe(ctx, recipe)
+	err := fs.Store.StoreRecipe(ctx, recipe)
 	if err != nil {
 		resp := pb.UploadResponse{
 			Success: false,
-			Id:      -1,
 		}
 		log.Fatalf("Failed to store the file: %s with Eroor: %v", filename, err)
 		return &resp, err
 	}
+
 	resp := pb.UploadResponse{
-		Success: false,
-		Id:      int32(id),
+		Success: true,
 	}
 	return &resp, err
 
