@@ -22,7 +22,7 @@ type Recipe struct {
 
 type Seen struct {
 	RecipeId int
-	nodes    *[]memberlist.Node
+	nodes    []*memberlist.Node
 }
 
 func NewStore(path string, fileMode os.FileMode) *Store {
