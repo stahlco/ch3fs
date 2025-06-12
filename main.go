@@ -19,7 +19,7 @@ func main() {
 	//go TestDummy(list)
 
 	//TestRecipeUpload: Testing the Functionality of the RecipeUpload service!
-	go TestUploadRecipe(list)
+	//go TestUploadRecipe(list)
 
 	//Background routine which prints the memberlist
 	go func() {
