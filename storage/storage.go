@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/binary"
 	"encoding/json"
-	"github.com/hashicorp/memberlist"
 	"go.etcd.io/bbolt"
 	"log"
 	"os"
@@ -18,11 +17,7 @@ type Recipe struct {
 	RecipeId int
 	filename string
 	content  string
-}
-
-type Seen struct {
-	RecipeId int
-	nodes    []*memberlist.Node
+	seen     []string
 }
 
 func NewStore(path string, fileMode os.FileMode) *Store {
