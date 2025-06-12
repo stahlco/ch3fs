@@ -6,13 +6,16 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/hashicorp/memberlist"
 	"log"
 	"os"
+	"time"
 )
 
 type FileServer struct {
 	pb.FileSystemServer
 	Store *storage.Store
+	Peers *memberlist.Memberlist
 }
 
 func NewFileServer(store *storage.Store) *FileServer {
@@ -41,11 +44,23 @@ func (fs FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadReque
 	default:
 	}
 
+	// Fetching Data from Request
 	filename, content := deconstructRecipeUploadRequest(req)
 	recipeUuid, _ := uuid.Parse(req.GetId())
 	recipe := storage.NewRecipe(recipeUuid, filename, content)
 
-	err := fs.Store.StoreRecipe(ctx, recipe)
+	// Checks before accessing the Database or/and Broadcasting
+	if len(req.GetSeen()) >= 3 {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("Has enough Replicas!")
+	}
+
+	// Writing to the Database asynchronous
+	errChan := make(chan error)
+	go func() {
+		errChan <- fs.Store.StoreRecipe(ctx, recipe)
+	}()
+
+	err := <-errChan
 	if err != nil {
 		resp := pb.UploadResponse{
 			Success: false,
@@ -54,11 +69,39 @@ func (fs FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadReque
 		return &resp, err
 	}
 
+	broadcastChan := make(chan *pb.UploadResponse)
+	go func() {
+		broadcastResponse, err := fs.BroadcastUploadRequest(req)
+		if err != nil {
+			log.Fatalf("Not able to broadcast the msg!")
+		}
+
+		broadcastChan <- broadcastResponse
+	}()
+
 	resp := pb.UploadResponse{
 		Success: true,
 	}
 	return &resp, err
 
+}
+
+func (fs FileServer) BroadcastUploadRequest(oldReq *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
+	req := fs.createBroadcastRequest(oldReq)
+
+	broadcastCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	//TODO
+}
+
+func (fs FileServer) createBroadcastRequest(oldReq *pb.RecipeUploadRequest) *pb.RecipeUploadRequest {
+	return &pb.RecipeUploadRequest{
+		Id:       oldReq.GetId(),
+		Filename: oldReq.GetFilename(),
+		Content:  []byte(oldReq.GetContent()),
+		Seen:     append(oldReq.GetSeen(), fs.Peers.LocalNode().Name), //Adds the Local Node to seen
+	}
 }
 
 func deconstructRecipeUploadRequest(req *pb.RecipeUploadRequest) (string, string) {

@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
+	"github.com/google/uuid"
 	"go.etcd.io/bbolt"
 	"log"
 	"os"
@@ -14,13 +14,7 @@ type Store struct {
 	Database *bbolt.DB
 }
 
-type Recipe struct {
-	RecipeId int
-	filename string
-	content  string
-	seen     []string
-}
-
+// NewStore constructs a new Store object based on a given Filepath to the Database file (Single .db File) with a predefined FileMode (0600)
 func NewStore(path string, fileMode os.FileMode) *Store {
 	db, err := bbolt.Open(path, fileMode, &bbolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -32,25 +26,35 @@ func NewStore(path string, fileMode os.FileMode) *Store {
 	}
 }
 
-func NewRecipe(filename string, content string) *Recipe {
+// Recipe represents a Cooking Recipe which is stored in the Database and broadcasted through the system.
+type Recipe struct {
+	RecipeId uuid.UUID
+	filename string
+	content  string
+	seen     []string
+}
+
+func NewRecipe(id uuid.UUID, filename string, content string) *Recipe {
 	return &Recipe{
+		RecipeId: id,
 		filename: filename,
 		content:  content,
 	}
 }
 
-func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) (uint64, error) {
-	var id uint64
-	return id, s.Database.Update(func(tx *bbolt.Tx) error {
+func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
+	return s.Database.Update(func(tx *bbolt.Tx) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		b := tx.Bucket([]byte("recipes"))
-		id, _ = b.NextSequence()
-		recipe.RecipeId = int(id)
+		b, err := tx.CreateBucketIfNotExists([]byte("recipes"))
+		if err != nil {
+			log.Fatalf("Error occured when Creating/Accessing the Bucket with Error: %v", err)
+			return err
+		}
 
 		content, err := json.Marshal(recipe)
 		if err != nil {
@@ -58,13 +62,6 @@ func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) (uint64, error)
 			return err
 		}
 
-		return b.Put(itob(recipe.RecipeId), content)
+		return b.Put(recipe.RecipeId[:], content)
 	})
-}
-
-// itob returns an 8-byte big endian representation of the recipe's ID
-func itob(id int) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(id))
-	return b
 }

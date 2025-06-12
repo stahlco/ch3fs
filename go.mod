@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.23.5
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/memberlist v0.5.3
 	go.etcd.io/bbolt v1.4.1
 	google.golang.org/grpc v1.73.0
