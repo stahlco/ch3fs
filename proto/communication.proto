@@ -29,18 +29,16 @@ message DummyTestResponse {
 }
 
 message RecipeUploadRequest {
-  string recipe_id = 1;  //UUID
   string filename = 2;
   bytes content = 3;
 }
 
 message UploadResponse {
   bool success = 1;
-  string msg = 2;
+  int32 id = 2;
 }
 
 message RecipeChunk {
-  string recipe_id = 1;
   string filename = 2;
   bytes data = 3;
 }
