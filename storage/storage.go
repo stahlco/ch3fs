@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"go.etcd.io/bbolt"
@@ -38,11 +39,16 @@ func NewRecipe(filename string, content string) *Recipe {
 	}
 }
 
-func (s *Store) StoreRecipe(recipe *Recipe) (uint64, error) {
+func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) (uint64, error) {
 	var id uint64
 	return id, s.Database.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte("recipes"))
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
+		b := tx.Bucket([]byte("recipes"))
 		id, _ = b.NextSequence()
 		recipe.RecipeId = int(id)
 
