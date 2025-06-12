@@ -2,16 +2,55 @@ syntax = "proto3";
 
 option go_package = "github.com/stahlco/ch3fs/proto/communication";
 
-service Functions {
-  rpc DummyTest (DummyReq) returns (DummyResp);
-  //rpc PostFile(File) returns (PostResponse);
-  //rpc GetFile(FileName) returns (File);
+service Ch3fsFileSystem {
+  // Dummy Function ≈ echo + "Receiver Server"
+  rpc DummyTest (DummyTestRequest) returns (DummyTestResponse);
+
+  // Upload Full File (~ 1MB large File)
+  rpc UploadRecipe (RecipeUploadRequest) returns (UploadResponse);
+
+  // Upload stream for larger Files (multi-MB large files)
+  rpc UploadRecipeStream (stream RecipeChunk) returns (UploadResponse);
+
+  // Download Full File (~ 1MB large Files)
+  rpc DownloadRecipe (RecipeDownloadRequest) returns (RecipeDownloadResponse);
+
+  // Download stream for larger Files (multi-MB large files)
+  rpc DownloadRecipeStream (RecipeDownloadRequest) returns (stream RecipeChunk);
+
 }
 
-message DummyReq {
+message DummyTestRequest {
   string msg = 1;
 }
 
-message DummyResp {
+message DummyTestResponse {
   string msg = 1;
 }
+
+message RecipeUploadRequest {
+  string recipe_id = 1;  //UUID
+  string filename = 2;
+  bytes content = 3;
+}
+
+message UploadResponse {
+  bool success = 1;
+  string msg = 2;
+}
+
+message RecipeChunk {
+  string recipe_id = 1;
+  string filename = 2;
+  bytes data = 3;
+}
+
+message RecipeDownloadRequest {
+  string recipe_id = 1;
+}
+
+message RecipeDownloadResponse {
+  string filename = 1;
+  bytes content = 2;
+}
+
