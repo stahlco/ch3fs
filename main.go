@@ -16,7 +16,10 @@ func main() {
 	go peer.Start()
 
 	// TestDummy: Testing the Functionality of the DummyFunction service!
-	go TestDummy(list)
+	//go TestDummy(list)
+
+	//TestRecipeUpload: Testing the Functionality of the RecipeUpload service!
+	go TestUploadRecipe(list)
 
 	//Background routine which prints the memberlist
 	go func() {
