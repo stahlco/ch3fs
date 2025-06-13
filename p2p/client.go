@@ -41,12 +41,12 @@ func SendDummyRequest(target string, request *pb.DummyTestRequest) {
 	log.Printf("Successfully sent DummyRequest, response: %s \n", res)
 }
 
-func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) {
+func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
 	log.Println("preparing connection...")
 
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return
+		log.Fatalf("Creating New Client failed!")
 	}
 	defer conn.Close()
 	client := pb.NewFileSystemClient(conn)
@@ -57,13 +57,14 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) {
 	res, err := client.UploadRecipe(ctx, request)
 	if err != nil {
 		log.Println("Error from server", err)
-		return
+		return nil, err
 	}
 	if !res.Success {
 		log.Println("Could not write to datastore")
-	} else {
-		log.Printf("Successfully sent RecipeUploadRequest, Id: %d \n", res.Id)
+		return nil, nil
 	}
+
+	return res, nil
 
 }
 
