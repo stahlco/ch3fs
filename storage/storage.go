@@ -30,16 +30,16 @@ func NewStore(path string, fileMode os.FileMode) *Store {
 // Recipe represents a Cooking Recipe which is stored in the Database and broadcasted through the system.
 type Recipe struct {
 	RecipeId uuid.UUID
-	filename string
-	content  string
-	seen     []string
+	Filename string
+	Content  string
+	Seen     []string
 }
 
 func NewRecipe(id uuid.UUID, filename string, content string) *Recipe {
 	return &Recipe{
 		RecipeId: id,
-		filename: filename,
-		content:  content,
+		Filename: filename,
+		Content:  content,
 	}
 }
 
@@ -69,11 +69,22 @@ func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
 	})
 }
 
+func (s *Store) UpdateRecipe(ctx context.Context, recipe *Recipe) error {
+	return nil
+}
+
+func (s *Store) UpdateRecipeSeenNodes(ctx context.Context)
+
 // GetRecipe retrieves a Recipe from the BoltDB database using the provided UUID.
-func (s *Store) GetRecipe(id uuid.UUID) (*Recipe, error) {
+func (s *Store) GetRecipe(ctx context.Context, id uuid.UUID) (*Recipe, error) {
 	var recipe Recipe
 
 	err := s.Database.View(func(tx *bbolt.Tx) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
 		b := tx.Bucket([]byte("recipes"))
 		if b == nil {
@@ -83,7 +94,7 @@ func (s *Store) GetRecipe(id uuid.UUID) (*Recipe, error) {
 		// id[:] converts the UUID into []byte
 		rawData := b.Get(id[:])
 		if rawData == nil {
-			return fmt.Errorf("recipe with uuid: %v not found", id)
+			return nil
 		}
 
 		return json.Unmarshal(rawData, &recipe)
@@ -96,10 +107,16 @@ func (s *Store) GetRecipe(id uuid.UUID) (*Recipe, error) {
 	return &recipe, err
 }
 
-func (s *Store) RecipeExists(id uuid.UUID) (bool, error) {
+func (s *Store) RecipeExists(ctx context.Context, id uuid.UUID) (bool, error) {
 	var exists bool
 
 	err := s.Database.View(func(tx *bbolt.Tx) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		bucket := tx.Bucket([]byte("recipes"))
 		if bucket == nil {
 			return fmt.Errorf("bucket recipes not found")
