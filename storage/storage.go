@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 	"go.etcd.io/bbolt"
 	"log"
@@ -42,6 +43,8 @@ func NewRecipe(id uuid.UUID, filename string, content string) *Recipe {
 	}
 }
 
+// StoreRecipe saves the given Recipe into the BoltDB database.
+// The Recipe is marshaled into JSON before being stored under its UUID key.
 func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
 	return s.Database.Update(func(tx *bbolt.Tx) error {
 		select {
@@ -64,4 +67,49 @@ func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
 
 		return b.Put(recipe.RecipeId[:], content)
 	})
+}
+
+// GetRecipe retrieves a Recipe from the BoltDB database using the provided UUID.
+func (s *Store) GetRecipe(id uuid.UUID) (*Recipe, error) {
+	var recipe Recipe
+
+	err := s.Database.View(func(tx *bbolt.Tx) error {
+
+		b := tx.Bucket([]byte("recipes"))
+		if b == nil {
+			return fmt.Errorf("bucket: recipes not found")
+		}
+
+		// id[:] converts the UUID into []byte
+		rawData := b.Get(id[:])
+		if rawData == nil {
+			return fmt.Errorf("recipe with uuid: %v not found", id)
+		}
+
+		return json.Unmarshal(rawData, &recipe)
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("getting recipe from database failed with Error: %v", err)
+	}
+
+	return &recipe, err
+}
+
+func (s *Store) RecipeExists(id uuid.UUID) (bool, error) {
+	var exists bool
+
+	err := s.Database.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte("recipes"))
+		if bucket == nil {
+			return fmt.Errorf("bucket recipes not found")
+		}
+
+		// id[:] converts the UUID into []byte
+		data := bucket.Get(id[:])
+		exists = data != nil
+		return nil
+	})
+
+	return exists, err
 }
