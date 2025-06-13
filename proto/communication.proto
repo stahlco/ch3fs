@@ -37,6 +37,7 @@ message RecipeUploadRequest {
 
 message UploadResponse {
   bool success = 1;
+  repeated string seen = 2;
 }
 
 message RecipeChunk {
