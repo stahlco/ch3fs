@@ -18,6 +18,7 @@ service FileSystem {
   // Download stream for larger Files (multi-MB large files)
   rpc DownloadRecipeStream (RecipeDownloadRequest) returns (stream RecipeChunk);
 
+  rpc UpdateRecipe (RecipeUpdateRequest) returns (UpdateResponse);
 }
 
 message DummyTestRequest {
@@ -54,3 +55,12 @@ message RecipeDownloadResponse {
   bytes content = 2;
 }
 
+// For now only the seen list can be updated!
+message RecipeUpdateRequest {
+  string id = 1;
+  repeated string seen = 2;
+}
+
+message UpdateResponse {
+  bool success = 1;
+}
