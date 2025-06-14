@@ -61,3 +61,13 @@ func FetchSystemMembers(list *memberlist.Memberlist) ([]*memberlist.Node, error)
 	}
 	return members, nil
 }
+
+func ListContains(l *memberlist.Memberlist, node string) bool {
+	for _, member := range l.Members() {
+		if member.Name == node {
+			return true
+		}
+	}
+
+	return false
+}

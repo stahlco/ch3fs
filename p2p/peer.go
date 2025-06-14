@@ -67,3 +67,13 @@ func (p *Peer) Stop() {
 		p.Server.GracefulStop()
 	}
 }
+
+func ListContains(l *memberlist.Memberlist, node *memberlist.Node) bool {
+	for _, member := range l.Members() {
+		if member == node {
+			return true
+		}
+	}
+
+	return false
+}

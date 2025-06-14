@@ -35,11 +35,12 @@ type Recipe struct {
 	Seen     []string
 }
 
-func NewRecipe(id uuid.UUID, filename string, content string) *Recipe {
+func NewRecipe(id uuid.UUID, filename string, content string, seen []string) *Recipe {
 	return &Recipe{
 		RecipeId: id,
 		Filename: filename,
 		Content:  content,
+		Seen:     seen,
 	}
 }
 
