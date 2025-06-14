@@ -74,8 +74,6 @@ func (s *Store) UpdateRecipe(ctx context.Context, recipe *Recipe) error {
 	return nil
 }
 
-func (s *Store) UpdateRecipeSeenNodes(ctx context.Context)
-
 // GetRecipe retrieves a Recipe from the BoltDB database using the provided UUID.
 func (s *Store) GetRecipe(ctx context.Context, id uuid.UUID) (*Recipe, error) {
 	var recipe Recipe

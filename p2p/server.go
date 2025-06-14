@@ -89,7 +89,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	//broadcast asynchronously
 	if len(seen) < 2 {
 		go func() {
-			if err = fs.BroadcastUpload(req, seen); err != nil {
+			if err = fs.broadcastUpload(req, seen); err != nil {
 				log.Fatalf("Broadcast Upload: %v failed with rrror: %v", recipeUuid, err)
 			}
 		}()
@@ -98,12 +98,17 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	return &pb.UploadResponse{Success: true, Seen: seen}, nil
 }
 
-func (fs *FileServer) BroadcastUpload(originalReq *pb.RecipeUploadRequest, seen []string) error {
+func (fs FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
+	return nil, nil
+}
+
+// Helper Functions
+
+func (fs *FileServer) broadcastUpload(originalReq *pb.RecipeUploadRequest, seen []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var replica2, replica3 *memberlist.Node
-	var needReplica2, needReplica3 bool = true, true
 
 	for {
 		select {
@@ -114,21 +119,16 @@ func (fs *FileServer) BroadcastUpload(originalReq *pb.RecipeUploadRequest, seen 
 
 		peers := filterPeers(fs.Peers.Members(), seen...)
 
-		if needReplica2 && needReplica3 && len(peers) < 2 {
+		if len(peers) < 2 {
 			return fmt.Errorf("insufficient amount of peers in the cluster")
 		}
 
-		if needReplica2 {
-			replica2 = peers[rand.Intn(len(peers))]
+		replica2 = peers[rand.Intn(len(peers))]
+		peers = filterPeers(peers, replica2.Name)
+		if len(peers) == 0 {
+			return fmt.Errorf("insufficient amount of peers in the cluster")
 		}
-
-		if needReplica3 {
-			peers = filterPeers(peers, replica2.Name)
-			if len(peers) == 0 {
-				return fmt.Errorf("insufficient amount of peers in the cluster")
-			}
-			replica3 = peers[rand.Intn(len(peers))]
-		}
+		replica3 = peers[rand.Intn(len(peers))]
 
 		// Seen Lists send to the Replicas
 		seenReplica2 := append(seen, replica3.Name) //seen = [currentNode, replica3]
@@ -138,25 +138,15 @@ func (fs *FileServer) BroadcastUpload(originalReq *pb.RecipeUploadRequest, seen 
 		r2Channel := make(chan bool, 1)
 		r3Channel := make(chan bool, 1)
 
-		if needReplica2 {
-			go func() {
-				result := fs.HandleUploadBroadcast(replica2, originalReq, seenReplica2) //includes backoff with jitter
-				r2Channel <- result
-			}()
-		} else {
-			// If we already delivered to replica2 we don't care about failure
-			r2Channel <- true
-		}
+		go func() {
+			result := fs.handleUploadBroadcast(replica2, originalReq, seenReplica2) //includes backoff with jitter
+			r2Channel <- result
+		}()
 
-		if needReplica3 {
-			go func() {
-				result := fs.HandleUploadBroadcast(replica3, originalReq, seenReplica3) //includes backoff with jitter
-				r3Channel <- result
-			}()
-		} else {
-			// If we already delivered to replica3 we don't care about failure
-			r3Channel <- true
-		}
+		go func() {
+			result := fs.handleUploadBroadcast(replica3, originalReq, seenReplica3) //includes backoff with jitter
+			r3Channel <- result
+		}()
 
 		r2Success := <-r2Channel
 		r3Success := <-r3Channel
@@ -179,29 +169,78 @@ func (fs *FileServer) BroadcastUpload(originalReq *pb.RecipeUploadRequest, seen 
 		case !r2Success && r3Success:
 			{
 				seen = append(seen, replica3.Name) // Add successful r3 to seen
-				needReplica2 = true
-				needReplica3 = false
-				continue
+
+				successfulNode := replica3
+
+				err := fs.handlePartialFailure(ctx, successfulNode, originalReq, seen)
+				if err != nil {
+					return err
+				}
+				log.Printf("Successfully broadcasted even with partial failure")
+				return nil
 			}
 		case r2Success && !r3Success:
 			{
-				seen = append(seen, replica2.Name) // Add successful r3 to seen
-				needReplica2 = false
-				needReplica3 = true
-				continue
+				seen = append(seen, replica2.Name)
+				successfulNode := replica2
+
+				err := fs.handlePartialFailure(ctx, successfulNode, originalReq, seen)
+				if err != nil {
+					return err
+				}
+				log.Printf("Successfully broadcasted even with partial failure")
+				return nil
 			}
 		default:
-			// Both failed - find new r2 and r3
 			{
-				needReplica2 = true // Need to find new r2
-				needReplica3 = true // Need to find new r3
 				continue
 			}
 		}
 	}
 }
 
-func (fs *FileServer) HandleUploadBroadcast(targetNode *memberlist.Node, originalReq *pb.RecipeUploadRequest, seen []string) bool {
+func (fs *FileServer) handlePartialFailure(ctx context.Context, successfulNode *memberlist.Node, originalReq *pb.RecipeUploadRequest, seen []string) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("broadcast timeout during recovery: %w", ctx.Err())
+		default:
+		}
+
+		peers := filterPeers(fs.Peers.Members(), seen...)
+		if len(peers) == 0 {
+			return fmt.Errorf("no available peers for r2 replacement")
+		}
+
+		newReplica2 := peers[rand.Intn(len(peers))]
+		seenNewReplica2 := append(seen, successfulNode.Name)
+
+		if fs.handleUploadBroadcast(newReplica2, originalReq, seenNewReplica2) {
+			// New r2 succeeded, now update r3's seen list and local storage
+			finalSeenList := append(seen, newReplica2.Name)
+			slices.Sort(finalSeenList)
+
+			// Update successful r3 node with new seen list including new r2
+			host, _, _ := net.SplitHostPort(successfulNode.Address())
+			target := host + ":8080"
+			recipeId, _ := uuid.Parse(originalReq.GetId())
+
+			if err := SendUpdateRecipe(target, recipeId, finalSeenList); err != nil {
+				return fmt.Errorf("failed to update seen list on successful node: %w", err)
+			}
+
+			// Update local storage
+			recipe := storage.NewRecipe(recipeId, originalReq.GetFilename(), string(originalReq.GetContent()), finalSeenList)
+			return fs.Store.UpdateRecipe(ctx, recipe)
+		} else {
+			// New r2 failed, add to seen and retry
+			seen = append(seen, newReplica2.Name)
+			continue
+		}
+	}
+}
+
+func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, originalReq *pb.RecipeUploadRequest, seen []string) bool {
 	host, _, _ := net.SplitHostPort(targetNode.Address())
 	target := host + ":8080"
 
@@ -230,6 +269,13 @@ func (fs *FileServer) HandleUploadBroadcast(targetNode *memberlist.Node, origina
 	}
 }
 
+// BackoffWithJitter calculates a random jittered backoff value
+// Is public, so that remote functions can access it.
+func BackoffWithJitter(backoff float64) float64 {
+	backoff = math.Min(backoff*2, CAP)
+	return rand.Float64() * backoff
+}
+
 func filterPeers(peers []*memberlist.Node, remove ...string) []*memberlist.Node {
 	var nodes []*memberlist.Node
 	for _, node := range peers {
@@ -239,17 +285,6 @@ func filterPeers(peers []*memberlist.Node, remove ...string) []*memberlist.Node 
 		nodes = append(nodes, node)
 	}
 	return nodes
-}
-
-func (fs FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
-	return nil, nil
-}
-
-// BackoffWithJitter calculates a random jittered backoff value
-// Is public, so that remote functions can access it.
-func BackoffWithJitter(backoff float64) float64 {
-	backoff = math.Min(backoff*2, CAP)
-	return rand.Float64() * backoff
 }
 
 func deconstructRecipeUploadRequest(req *pb.RecipeUploadRequest) (string, string) {

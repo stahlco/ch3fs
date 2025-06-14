@@ -4,6 +4,7 @@ import (
 	pb "ch3fs/proto"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -67,6 +68,9 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*p
 	return res, nil
 
 }
+
+// Just needed that for the server side
+func SendUpdateRecipe(target string, id uuid.UUID, seen []string) error {}
 
 func ConstructRecipeUploadRequest() pb.RecipeUploadRequest {
 	count := 1
