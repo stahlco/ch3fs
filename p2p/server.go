@@ -232,10 +232,6 @@ func (fs *FileServer) handlePartialFailure(ctx context.Context, successfulNode *
 			// Update local storage
 			recipe := storage.NewRecipe(recipeId, originalReq.GetFilename(), string(originalReq.GetContent()), finalSeenList)
 			return fs.Store.UpdateRecipe(ctx, recipe)
-		} else {
-			// New r2 failed, add to seen and retry
-			seen = append(seen, newReplica2.Name)
-			continue
 		}
 	}
 }
