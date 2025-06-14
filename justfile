@@ -1,4 +1,4 @@
-build:
+build: proto
 	@go build -o bin/chefs
 
 run: build

@@ -1297,6 +1297,11 @@
     <inspection_tool class="AndroidUnresolvedRoomSqlReference" enabled="true" level="ERROR" enabled_by_default="true">
       <scope name="Project Files" level="ERROR" enabled="true" />
     </inspection_tool>
+    <inspection_tool class="GoDfaErrorMayBeNotNil" enabled="true" level="WARNING" enabled_by_default="true">
+      <methods>
+        <method importPath="ch3fs/storage" receiver="*Store" name="GetRecipe" />
+      </methods>
+    </inspection_tool>
     <inspection_tool class="NavigationFile" enabled="true" level="ERROR" enabled_by_default="true">
       <scope name="Project Files" level="ERROR" enabled="true" />
     </inspection_tool>

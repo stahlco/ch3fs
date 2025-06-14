@@ -4,12 +4,10 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     restart: unless-stopped
-    env_file:
-      - docker/.env
     networks:
       - kitchen
     deploy:
-      replicas: 5
+      replicas: 10
       restart_policy:
         condition: on-failure
 
