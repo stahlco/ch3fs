@@ -225,7 +225,7 @@ func (fs *FileServer) handlePartialFailure(ctx context.Context, successfulNode *
 			target := host + ":8080"
 			recipeId, _ := uuid.Parse(originalReq.GetId())
 
-			if err := SendUpdateRecipe(target, recipeId, finalSeenList); err != nil {
+			if err := sendUpdateRecipe(target, recipeId, finalSeenList); err != nil {
 				return fmt.Errorf("failed to update seen list on successful node: %w", err)
 			}
 
@@ -234,6 +234,34 @@ func (fs *FileServer) handlePartialFailure(ctx context.Context, successfulNode *
 			return fs.Store.UpdateRecipe(ctx, recipe)
 		}
 	}
+}
+
+// sendUpdateRecipe updates the seen[] to the one successful replica holding onto wrong seen[], after replication failed
+func sendUpdateRecipe(target string, id uuid.UUID, seen []string) error {
+	/*
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		var replica4 *memberlist.Node
+		replica4 = filterPeers(fs.Peers.Members(), target)
+		for {
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("broadcast timeout: %w", ctx.Err())
+			default:
+			}
+			r4Channel := make(chan bool, 1)
+
+			go func() {
+				result := fs.handleUploadBroadcast(replica4, originalReq, seenReplica2) //includes backoff with jitter
+				r4Channel <- result
+			}()
+
+			r4Success := <-r4Channel
+		}
+
+	*/
+	return nil
 }
 
 func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, originalReq *pb.RecipeUploadRequest, seen []string) bool {
