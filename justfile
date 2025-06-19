@@ -19,6 +19,10 @@ clean:
 up:
    docker compose up --build --detach --timeout 3
 
+# Spins up/ Shuts down
+scale x:
+   docker compose up --detach --scale ch3f={{x}}
+
 # Shuts down the containers (remove-orphans = Removes any containers created by a previous run, )
 down:
     docker compose down --remove-orphans --timeout 3
