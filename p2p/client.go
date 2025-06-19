@@ -11,6 +11,13 @@ import (
 )
 
 type Client struct {
+	server *FileServer
+}
+
+func NewClient(server *FileServer) *Client {
+	return &Client{
+		server: server,
+	}
 }
 
 //TODO file check <1mb

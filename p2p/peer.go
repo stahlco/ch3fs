@@ -2,11 +2,14 @@ package p2p
 
 import (
 	pb "ch3fs/proto"
+	"ch3fs/storage"
 	"fmt"
 	"github.com/hashicorp/memberlist"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 )
 
 type Peer struct {
@@ -27,7 +30,12 @@ type Peer struct {
 
 func NewPeer(list *memberlist.Memberlist) *Peer {
 	s := grpc.NewServer()
-	service := &FileServer{}
+
+	// Create unique database
+	hostname, _ := os.Hostname()
+	path := filepath.Join("/storage", fmt.Sprintf("%s_bbolt.db", hostname))
+
+	service := NewFileServer(storage.NewStore(path, 0600))
 	pb.RegisterFileSystemServer(s, service)
 
 	// Returns 172.0. ... :7946 but we want 8080

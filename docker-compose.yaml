@@ -10,7 +10,11 @@ services:
       replicas: 10
       restart_policy:
         condition: on-failure
-
+    volumes:
+      - container_storage:/storage
+volumes:
+  container_storage:
+    driver: local
 networks:
   kitchen:
     name: kitchen

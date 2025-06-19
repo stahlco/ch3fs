@@ -22,6 +22,8 @@ func NewStore(path string, fileMode os.FileMode) *Store {
 		log.Fatalf("Opening the Database on Path: %s with FileMode: %v failed. Error: %v", path, fileMode, err)
 		return nil
 	}
+
+	log.Printf("[INFO] Successfully created Database with name: %s", path)
 	return &Store{
 		Database: db,
 	}
