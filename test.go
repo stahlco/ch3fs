@@ -53,7 +53,11 @@ func TestUploadRecipe(list *memberlist.Memberlist) {
 			break
 		}
 		request := p2p.ConstructRecipeUploadRequest()
-		p2p.SendRecipeUploadRequest(target, &request)
+		uploadRequest, err := p2p.SendRecipeUploadRequest(target, &request)
+		if err != nil {
+			log.Println("Error uploading request")
+		}
+		log.Printf("upload succeeded?: %v", uploadRequest.Success)
 	}
 
 }
