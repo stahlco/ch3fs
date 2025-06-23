@@ -56,21 +56,31 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*p
 	defer cancel()
 
 	res, err := client.UploadRecipe(ctx, request)
-	if err != nil {
-		log.Println("Error from server", err)
-		return nil, err
+
+	//Retrying with Jitter, until the Client has uploaded the recipe:
+	backoff := 50.0
+	for {
+		if err != nil {
+			log.Println("Error from server", err)
+			backoff = BackoffWithJitter(backoff, 10000)
+			time.Sleep(time.Duration(backoff) * time.Millisecond)
+			res, err = client.UploadRecipe(ctx, request)
+			continue
+		}
 	}
+
 	if !res.Success {
 		log.Println("Could not write to datastore")
 		return nil, nil
 	}
 
 	return res, nil
-
 }
 
 // Just needed that for the server side
-func SendUpdateRecipe(target string, id uuid.UUID, seen []string) error {}
+func SendUpdateRecipe(target string, id uuid.UUID, seen []string) error {
+	return nil
+}
 
 func ConstructRecipeUploadRequest() pb.RecipeUploadRequest {
 	count := 1

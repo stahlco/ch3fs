@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
+	"github.com/shirou/gopsutil/v4/cpu"
 	"log"
 	"math"
 	"math/rand"
@@ -45,6 +46,18 @@ func (fs FileServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*
 }
 
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
+
+	//Load shedding for POST requests at CPU threshold of >= 90%:
+	//Priority of requests: GET > PUT > POST
+	//percpu = false defines, that percents is one percent number which represents the CPU usage of all cores combined
+	//retries are implemented on the client side
+	percents, err := cpu.Percent(10*time.Millisecond, false)
+	if err != nil {
+		fmt.Errorf("Could not monitor CPU threshold")
+	} else if percents[0] > 85 {
+		return nil, fmt.Errorf("CPU threshold is too high")
+	}
+
 	// Checking the Context for cancellation
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -254,7 +267,7 @@ func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, origina
 			return false
 		}
 		if err != nil && ListContains(fs.Peers, targetNode) {
-			backoff = BackoffWithJitter(backoff)
+			backoff = BackoffWithJitter(backoff, CAP)
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			continue
 		}
@@ -267,8 +280,8 @@ func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, origina
 
 // BackoffWithJitter calculates a random jittered backoff value
 // Is public, so that remote functions can access it.
-func BackoffWithJitter(backoff float64) float64 {
-	backoff = math.Min(backoff*2, CAP)
+func BackoffWithJitter(backoff float64, maxTime float64) float64 {
+	backoff = math.Min(backoff*2, maxTime)
 	return rand.Float64() * backoff
 }
 
