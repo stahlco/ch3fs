@@ -5,7 +5,9 @@ import (
 	"ch3fs/storage"
 	"fmt"
 	"github.com/hashicorp/memberlist"
+	"github.com/hashicorp/raft"
 	"google.golang.org/grpc"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -26,7 +28,31 @@ type Peer struct {
 
 	//Information about the system
 	Peers *memberlist.Memberlist
+	Raft  *raft.Raft
 }
+
+type CH3FSM struct {
+	storage *storage.Store
+}
+
+type Snapshot struct{}
+
+func (f *CH3FSM) Apply(log *raft.Log) interface{} {
+	return nil
+}
+
+func (f *CH3FSM) Snapshot() (raft.FSMSnapshot, error) {
+	return &Snapshot{}, nil
+}
+
+func (f *CH3FSM) Restore(rc io.ReadCloser) error {
+	return nil
+}
+
+func (s *Snapshot) Persist(_ raft.SnapshotSink) error {
+	return nil
+}
+func (s *Snapshot) Release() {}
 
 func NewPeer(list *memberlist.Memberlist) *Peer {
 	s := grpc.NewServer()
