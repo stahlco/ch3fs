@@ -47,7 +47,7 @@ func (fs FileServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*
 
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
 
-	//Load shedding for POST requests at CPU threshold of >= 90%:
+	//Load shedding for POST requests at CPU threshold of >= 85%:
 	//Priority of requests: GET > PUT > POST
 	//percpu = false defines, that percents is one percent number which represents the CPU usage of all cores combined
 	//retries are implemented on the client side
