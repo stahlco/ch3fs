@@ -25,17 +25,18 @@ type Peer struct {
 	MemberlistPort int
 
 	//Information about the system
-	Peers *memberlist.Memberlist
+	Peers    *memberlist.Memberlist
+	RaftNode *RaftNode
 }
 
-func NewPeer(list *memberlist.Memberlist) *Peer {
+func NewPeer(list *memberlist.Memberlist, raft *RaftNode) *Peer {
 	s := grpc.NewServer()
 
 	// Create unique database
 	hostname, _ := os.Hostname()
 	path := filepath.Join("/storage", fmt.Sprintf("%s_bbolt.db", hostname))
 
-	service := NewFileServer(storage.NewStore(path, 0600))
+	service := NewFileServer(storage.NewStore(path, 0600), raft, list)
 	pb.RegisterFileSystemServer(s, service)
 
 	// Returns 172.0. ... :7946 but we want 8080
@@ -52,6 +53,7 @@ func NewPeer(list *memberlist.Memberlist) *Peer {
 		GrpcPort:       8080,
 		MemberlistPort: 7946,
 		Peers:          list,
+		RaftNode:       raft,
 	}
 }
 
@@ -83,5 +85,14 @@ func ListContains(l *memberlist.Memberlist, node *memberlist.Node) bool {
 		}
 	}
 
+	return false
+}
+
+func ListContainsContainerName(l *memberlist.Memberlist, container string) bool {
+	for _, m := range l.Members() {
+		if m.Name == container {
+			return true
+		}
+	}
 	return false
 }

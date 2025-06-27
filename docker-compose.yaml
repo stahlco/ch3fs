@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     restart: unless-stopped
+    env_file:
+      - docker/.env
     networks:
       - kitchen
     deploy:
@@ -12,6 +14,7 @@ services:
         condition: on-failure
     volumes:
       - container_storage:/storage
+      - /var/run/docker.sock:/var/run/docker.sock
 volumes:
   container_storage:
     driver: local
