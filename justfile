@@ -9,7 +9,7 @@ proto:
     protoc --proto_path=./proto \
       --go_out=./proto --go_opt=paths=source_relative \
       --go-grpc_out=./proto --go-grpc_opt=paths=source_relative \
-      $(find ./prot o -name "*.proto")
+      $(find ./proto -name "*.proto")
     go mod tidy
 
 clean:

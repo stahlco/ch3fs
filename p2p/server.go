@@ -5,11 +5,14 @@ import (
 	"ch3fs/storage"
 	"context"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/memberlist"
+	"github.com/hashicorp/raft"
 	"math"
 	"math/rand"
 	"os"
 	"slices"
+	"time"
 )
 
 const CAP = 15000.0
@@ -18,14 +21,12 @@ const GRPCPort = 8080
 type FileServer struct {
 	pb.FileSystemServer
 	Store *storage.Store
-	Peers *memberlist.Memberlist
 	Raft  *RaftNode
 }
 
-func NewFileServer(store *storage.Store, raft *RaftNode, ml *memberlist.Memberlist) *FileServer {
+func NewFileServer(store *storage.Store, raft *RaftNode) *FileServer {
 	return &FileServer{
 		Store: store,
-		Peers: ml,
 		Raft:  raft,
 	}
 }
@@ -41,6 +42,41 @@ func (fs FileServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*
 	// do smth
 	resp := pb.DummyTestResponse{Msg: fmt.Sprintf("%s and I am Server: %s, ", req.GetMsg(), hn)}
 	return &resp, nil
+}
+
+// UploadRecipe implements the gRPC method for uploading a recipe via Raft consensus.
+func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
+	// checking context
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	if req == nil {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("request cannot be nil")
+	}
+
+	if fs.Raft.Raft.State() != raft.Leader {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("not the leader")
+	}
+
+	// serializing request for raft consensus
+	data, err := proto.Marshal(req)
+	if err != nil {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// raft apply
+	applyFuture := fs.Raft.Raft.Apply(data, 5*time.Second)
+	if err := applyFuture.Error(); err != nil {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("raft apply failed: %w", err)
+	}
+
+	// response from fsm apply, can be nil or a UploadResponse
+	if resp, ok := applyFuture.Response().(*pb.UploadResponse); ok {
+		return resp, nil
+	}
+
+	return &pb.UploadResponse{Success: false}, nil
 }
 
 /*
