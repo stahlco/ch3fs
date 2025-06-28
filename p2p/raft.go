@@ -38,12 +38,6 @@ type RaftNode struct {
 	TransportManager *transport.Manager
 }
 
-type NodeMetadata struct {
-	RaftID      raft.ServerID      `json:"raft_id"`
-	RaftAddress raft.ServerAddress `json:"raft_address"`
-	StartTime   time.Time          `json:"start_time"`
-}
-
 func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist, raftID string, raftAddr string) (*RaftNode, error) {
 
 	c := raft.DefaultConfig()
@@ -130,18 +124,6 @@ func (f fsm) Snapshot() (raft.FSMSnapshot, error) {
 func (f fsm) Restore(snapshot io.ReadCloser) error {
 	//TODO implement me
 	panic("implement me")
-}
-
-// GetBootstrapNode returns the first Leader which Bootstrapped the Cluster
-func GetBootstrapNode(ml *memberlist.Memberlist) *memberlist.Node {
-	nodes := ml.Members()
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].Name < nodes[j].Name
-	})
-
-	log.Printf("[DEBUG] Leader should be: %s", nodes[0].Name)
-
-	return nodes[0]
 }
 
 func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
