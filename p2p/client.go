@@ -47,7 +47,7 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*p
 	for {
 		if err != nil {
 			log.Println("Error from server", err)
-			backoff = BackoffWithJitter(backoff, 10000)
+			backoff = BackoffWithJitter(backoff)
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			res, err = client.UploadRecipe(ctx, request)
 			continue
@@ -65,31 +65,6 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*p
 // Just needed that for the server side
 func SendUpdateRecipe(target string, id uuid.UUID, seen []string) error {
 	return nil
-}
-
-func Join(target string, id string, addr string) (*pb.JoinResponse, error) {
-	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("Not able to create a grpc client for target: %s", target)
-	}
-	defer conn.Close()
-
-	client := pb.NewRaftClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	req := &pb.JoinRequest{
-		Id:   id,
-		Addr: addr,
-	}
-	log.Printf("Now sending join request to server")
-
-	res, err := client.Join(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("joining cluster of server failed with error: %s", err)
-	}
-	return res, nil
 }
 
 func ConstructRecipeUploadRequest() pb.RecipeUploadRequest {
