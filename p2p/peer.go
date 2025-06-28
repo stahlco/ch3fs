@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"log"
 	"net"
@@ -37,8 +38,23 @@ type CH3FSM struct {
 
 type Snapshot struct{}
 
+type RaftCommand struct {
+	Upload pb.RecipeUploadRequest //Data inside the command e.g. recipe
+}
+
+// Broadcasting of UploadRequests among the RaftNodes
+// The are only Upload and Download => only Upload is broadcasted
+// log.Data = RecipeUploadRequest
 func (f *CH3FSM) Apply(log *raft.Log) interface{} {
-	return nil
+
+	var uploadReq pb.RecipeUploadRequest
+	err := proto.Unmarshal(log.Data, &uploadReq)
+	if err != nil {
+		fmt.Errorf("failed to unmarshal raft command")
+		return nil
+	}
+	err := f.storage.StoreRecipe(ctx)
+
 }
 
 func (f *CH3FSM) Snapshot() (raft.FSMSnapshot, error) {
