@@ -1,5 +1,5 @@
 ### Overview
-Distributed P2P Storage System for Recipes. This represents the Group-work of `Cedric Borchardt`, `Johannes Duschl` 
+Distributed P2P Storage System optizimed for reads of recipes. This represents the group-work of `Cedric Borchardt`, `Johannes Duschl` 
 and `Constantin Stahl` for the `TU Berlin Scalability Engineering 2025 coding task`.
 
 ---
@@ -46,5 +46,5 @@ Includes, all `.pb.go` files. Does not include the compiled binary.
 Go Library for Membership in a Dist Sys via Gossiping: [Github-Link](https://github.com/hashicorp/memberlist)\
 CRDTs: [Blogpost-Link](https://crdt.tech/) \
 Mögliche Database, jeder Peer hat eine eigene: [Github-Link](https://github.com/etcd-io/bbolt) \
-Raft Consensus Algorithm: [Github-Link](https://raft.github.io/) \
-Auch von HashiCorp eine Implementation von Raft: [Github-Link](https://github.com/hashicorp/raft)
+RaftNode Consensus Algorithm: [Github-Link](https://raft.github.io/) \
+Auch von HashiCorp eine Implementation von RaftNode: [Github-Link](https://github.com/hashicorp/raft)

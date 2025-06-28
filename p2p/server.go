@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
-	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/hashicorp/raft"
 	"log"
 	"math"
 	"math/rand"
@@ -22,14 +22,76 @@ const GRPCPort = 8080
 
 type FileServer struct {
 	pb.FileSystemServer
+	pb.RaftServer
 	Store *storage.Store
 	Peers *memberlist.Memberlist
+	Raft  *RaftNode
 }
 
-func NewFileServer(store *storage.Store) *FileServer {
+func NewFileServer(store *storage.Store, raft *RaftNode, ml *memberlist.Memberlist) *FileServer {
 	return &FileServer{
 		Store: store,
+		Peers: ml,
+		Raft:  raft,
 	}
+}
+
+func (fs *FileServer) Join(ctx context.Context, req *pb.JoinRequest) (*pb.JoinResponse, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	nodeID := req.Id
+	addr := req.Addr
+
+	log.Printf("[INFO] Received join request from node with id: %s", nodeID)
+
+	if addr == fs.Peers.LocalNode().Address() || nodeID == fs.Peers.LocalNode().Name {
+		return &pb.JoinResponse{
+			Success: false,
+		}, fmt.Errorf("address or nodename equals with leaders address or nodename")
+	}
+
+	ra := fs.Raft.Raft
+
+	cfgFuture := ra.GetConfiguration()
+	if err := cfgFuture.Error(); err != nil {
+		log.Printf("[WARN] failed to get raft configuration with error: %v", err)
+		return &pb.JoinResponse{
+			Success: false,
+		}, fmt.Errorf("fetching raft config not successful with error: %v", err)
+	}
+
+	for _, server := range cfgFuture.Configuration().Servers {
+		if server.ID == raft.ServerID(nodeID) && server.Address == raft.ServerAddress(addr) {
+			log.Printf("[DEBUG] Node with ID: %s and Addr: %s is already in cluster, ignoring join", nodeID, addr)
+			return &pb.JoinResponse{
+				Success: false,
+			}, nil
+		}
+		if server.ID == raft.ServerID(nodeID) || server.Address == raft.ServerAddress(addr) {
+			future := ra.RemoveServer(server.ID, 0, 300*time.Millisecond)
+			if err := future.Error(); err != nil {
+				return &pb.JoinResponse{Success: false}, fmt.Errorf("removing Server from the cluster failed with error: %v", err)
+			}
+		}
+	}
+
+	future := ra.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 0, 300*time.Millisecond)
+	if future.Error() != nil {
+		return &pb.JoinResponse{
+			Success: false,
+		}, fmt.Errorf("adding voter to cluster failed with error: %v", future.Error())
+	}
+
+	log.Printf("[INFO] Node with ID: %s, successfully joined the Raft cluster", nodeID)
+
+	return &pb.JoinResponse{
+		Success: true,
+		Err:     "",
+	}, nil
 }
 
 func (fs FileServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*pb.DummyTestResponse, error) {
@@ -46,18 +108,6 @@ func (fs FileServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*
 }
 
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
-
-	//Load shedding for POST requests at CPU threshold of >= 85%:
-	//Priority of requests: GET > PUT > POST
-	//percpu = false defines, that percents is one percent number which represents the CPU usage of all cores combined
-	//retries are implemented on the client side
-	percents, err := cpu.Percent(10*time.Millisecond, false)
-	if err != nil {
-		fmt.Errorf("Could not monitor CPU threshold")
-	} else if percents[0] > 85 {
-		return nil, fmt.Errorf("CPU threshold is too high")
-	}
-
 	// Checking the Context for cancellation
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -295,7 +345,7 @@ func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, origina
 			return false
 		}
 		if err != nil && ListContains(fs.Peers, targetNode) {
-			backoff = BackoffWithJitter(backoff, CAP)
+			backoff = BackoffWithJitter(backoff)
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			continue
 		}
@@ -308,8 +358,8 @@ func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, origina
 
 // BackoffWithJitter calculates a random jittered backoff value
 // Is public, so that remote functions can access it.
-func BackoffWithJitter(backoff float64, maxTime float64) float64 {
-	backoff = math.Min(backoff*2, maxTime)
+func BackoffWithJitter(backoff float64) float64 {
+	backoff = math.Min(backoff*2, CAP)
 	return rand.Float64() * backoff
 }
 

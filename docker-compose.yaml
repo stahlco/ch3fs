@@ -4,13 +4,20 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     restart: unless-stopped
+    env_file:
+      - docker/.env
     networks:
       - kitchen
     deploy:
       replicas: 10
       restart_policy:
         condition: on-failure
-
+    volumes:
+      - container_storage:/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+volumes:
+  container_storage:
+    driver: local
 networks:
   kitchen:
     name: kitchen
