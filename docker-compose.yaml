@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+    ports:
+      - "8081-8090:8080"
     restart: unless-stopped
     networks:
       - kitchen
@@ -13,6 +15,15 @@ services:
     volumes:
       - container_storage:/storage
       - /var/run/docker.sock:/var/run/docker.sock
+
+  client:
+    build: ./cmd
+    networks:
+      - kitchen
+    depends_on:
+      - ch3f
+
+      
 volumes:
   container_storage:
     driver: local

@@ -41,36 +41,36 @@ type RaftNode struct {
 	TransportManager *transport.Manager
 }
 
-func NewRaftWithReplicaDiscovery(ctx context.Context, ml *memberlist.Memberlist, raftID string, raftAddr string) (*RaftNode, error) {
+func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist, raftID string, raftAddr string) (*RaftNode, *storage.Store, error) {
 
 	c := raft.DefaultConfig()
 	c.LocalID = raft.ServerID(raftID)
 
 	basePath := filepath.Join("/storage", fmt.Sprintf("%s_raft", raftID))
 	if err := os.MkdirAll(basePath, 0700); err != nil {
-		return nil, fmt.Errorf("creating basePath dir failed: %v", err)
+		return nil, nil, fmt.Errorf("creating basePath dir failed: %v", err)
 	}
 
 	log.Printf("[TRACE] basePath for raft databases create as: %s", basePath)
 
 	logDb, err := rbolt.NewBoltStore(filepath.Join(basePath, "logs.db"))
 	if err != nil {
-		return nil, fmt.Errorf("creating a log store failed with error: %v", err)
+		return nil, nil, fmt.Errorf("creating a log store failed with error: %v", err)
 	}
 
 	//Stable Store - stores critical metadata like votes,
 	stableDb, err := rbolt.NewBoltStore(filepath.Join(basePath, "stable.db"))
 	if err != nil {
-		return nil, fmt.Errorf("creating a stable store failed with error: %v", err)
+		return nil, nil, fmt.Errorf("creating a stable store failed with error: %v", err)
 	}
 
 	snapStore, err := raft.NewFileSnapshotStore(basePath, 3, os.Stderr)
 	if err != nil {
-		return nil, fmt.Errorf("creating file snapshot store failed with error: %v", err)
+		return nil, nil, fmt.Errorf("creating file snapshot store failed with error: %v", err)
 	}
 
 	//creating store for the persistent recipes, stored in each raftNode
-	path := filepath.Join("/storage", fmt.Sprintf("%s_bbolt.db", raftID))
+	path := filepath.Join(basePath, fmt.Sprintf("%s_bbolt.db", raftID))
 	persistentStore := storage.NewStore(path, 0600)
 
 	tm := transport.New(
@@ -83,7 +83,7 @@ func NewRaftWithReplicaDiscovery(ctx context.Context, ml *memberlist.Memberlist,
 	tm.Register(grpcServer)
 	lis, err := net.Listen("tcp", raftAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen on %s: %v", raftAddr, err)
+		return nil, nil, fmt.Errorf("failed to listen on %s: %v", raftAddr, err)
 	}
 	go func() {
 		log.Printf("gRPC Raft server listening on %s", raftAddr)
@@ -99,7 +99,7 @@ func NewRaftWithReplicaDiscovery(ctx context.Context, ml *memberlist.Memberlist,
 
 	ra, err := raft.NewRaft(c, fsm, logDb, stableDb, snapStore, tm.Transport())
 	if err != nil {
-		return nil, fmt.Errorf("creating new raft failed with error: %v", err)
+		return nil, nil, fmt.Errorf("creating new raft failed with error: %v", err)
 	}
 
 	if shouldBootstrap(ra) {
@@ -113,9 +113,11 @@ func NewRaftWithReplicaDiscovery(ctx context.Context, ml *memberlist.Memberlist,
 	}
 
 	return &RaftNode{
-		Raft:             ra,
-		TransportManager: tm,
-	}, nil
+			Raft:             ra,
+			TransportManager: tm,
+		},
+		persistentStore,
+		nil
 }
 
 type fsm struct {

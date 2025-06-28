@@ -76,7 +76,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// raft apply
+	// raft apply, new entry should be appended to log and replicated to every node
 	applyFuture := fs.Raft.Raft.Apply(data, 5*time.Second)
 	if err := applyFuture.Error(); err != nil {
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("raft apply failed: %w", err)

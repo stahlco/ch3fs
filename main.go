@@ -2,9 +2,12 @@ package main
 
 import (
 	"ch3fs/p2p"
+	pb "ch3fs/proto"
 	"context"
 	"flag"
+	"google.golang.org/grpc"
 	"log"
+	"net"
 	"time"
 )
 
@@ -23,16 +26,22 @@ func main() {
 	raftID := p2p.GenerateRaftID()
 	ctx := context.Background()
 
-	node, err := p2p.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
+	node, persistentStore, err := p2p.NewRaftWithReplicaDiscorvery(ctx, ml, raftID, ":50051")
 	if err != nil {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
+	fileServer := p2p.NewFileServer(persistentStore, node)
+	
+	//starting gRPC server functionality, enables test client to reach a node on port 8080
+	lis, err := net.Listen("tcp", ":8080")
+	grpcServer := grpc.NewServer()
 
-	// TestDummy: Testing the Functionality of the DummyFunction service!
-	//go TestDummy(list)
+	pb.RegisterFileSystemServer(grpcServer, fileServer)
 
-	//TestRecipeUpload: Testing the Functionality of the RecipeUpload service!
-	//go TestUploadRecipe(list)
+	log.Printf("gRPC FileServer listening on :8080")
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("gRPC Serve failed: %v", err)
+	}
 
 	//Background routine which prints the memberlist
 	go func() {
