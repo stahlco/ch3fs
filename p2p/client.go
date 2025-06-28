@@ -4,6 +4,7 @@ import (
 	pb "ch3fs/proto"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -40,12 +41,30 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*p
 	defer cancel()
 
 	res, err := client.UploadRecipe(ctx, request)
-	if err != nil {
-		log.Println("Error from server", err)
-		return res, err
-	}
-	return res, nil
 
+	//Retrying with Jitter, until the Client has uploaded the recipe:
+	backoff := 50.0
+	for {
+		if err != nil {
+			log.Println("Error from server", err)
+			backoff = BackoffWithJitter(backoff, 10000)
+			time.Sleep(time.Duration(backoff) * time.Millisecond)
+			res, err = client.UploadRecipe(ctx, request)
+			continue
+		}
+	}
+
+	if !res.Success {
+		log.Println("Could not write to datastore")
+		return nil, nil
+	}
+
+	return res, nil
+}
+
+// Just needed that for the server side
+func SendUpdateRecipe(target string, id uuid.UUID, seen []string) error {
+	return nil
 }
 
 func Join(target string, id string, addr string) (*pb.JoinResponse, error) {
@@ -82,7 +101,6 @@ func ConstructRecipeUploadRequest() pb.RecipeUploadRequest {
 	recipeDesc := fmt.Sprintf("This is the recipe%d´s description", fileIdCounter)
 	content = []byte(recipeDesc)
 	count++
-
 	return pb.RecipeUploadRequest{Filename: filename, Content: content}
 }
 
