@@ -15,7 +15,7 @@ var (
 func main() {
 	flag.Parse()
 
-	ml, err := DiscoverAndJoinPeers()
+	ml, err := p2p.DiscoverAndJoinPeers()
 	if err != nil {
 		log.Fatalf("failed to setup Memberlist: %v", err)
 	}
