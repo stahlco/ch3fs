@@ -5,15 +5,11 @@ import (
 	"ch3fs/storage"
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
-	"log"
 	"math"
 	"math/rand"
-	"net"
 	"os"
 	"slices"
-	"time"
 )
 
 const CAP = 15000.0
@@ -23,11 +19,14 @@ type FileServer struct {
 	pb.FileSystemServer
 	Store *storage.Store
 	Peers *memberlist.Memberlist
+	Raft  *RaftNode
 }
 
-func NewFileServer(store *storage.Store) *FileServer {
+func NewFileServer(store *storage.Store, raft *RaftNode, ml *memberlist.Memberlist) *FileServer {
 	return &FileServer{
 		Store: store,
+		Peers: ml,
+		Raft:  raft,
 	}
 }
 
@@ -44,6 +43,7 @@ func (fs FileServer) DummyTest(ctx context.Context, req *pb.DummyTestRequest) (*
 	return &resp, nil
 }
 
+/*
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
 	// Checking the Context for cancellation
 	if err := ctx.Err(); err != nil {
@@ -101,7 +101,6 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 func (fs FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
 	return nil, nil
 }
-
 // Helper Functions
 
 func (fs *FileServer) broadcastUpload(originalReq *pb.RecipeUploadRequest, seen []string) error {
@@ -238,7 +237,7 @@ func (fs *FileServer) handlePartialFailure(ctx context.Context, successfulNode *
 
 // sendUpdateRecipe updates the seen[] to the one successful replica holding onto wrong seen[], after replication failed
 func sendUpdateRecipe(target string, id uuid.UUID, seen []string) error {
-	/*
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -260,7 +259,6 @@ func sendUpdateRecipe(target string, id uuid.UUID, seen []string) error {
 			r4Success := <-r4Channel
 		}
 
-	*/
 	return nil
 }
 
@@ -282,7 +280,7 @@ func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, origina
 			return false
 		}
 		if err != nil && ListContains(fs.Peers, targetNode) {
-			backoff = BackoffWithJitter(backoff)
+			backoff = BackoffWithJitter(backoff, CAP)
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			continue
 		}
@@ -292,13 +290,7 @@ func (fs *FileServer) handleUploadBroadcast(targetNode *memberlist.Node, origina
 		}
 	}
 }
-
-// BackoffWithJitter calculates a random jittered backoff value
-// Is public, so that remote functions can access it.
-func BackoffWithJitter(backoff float64) float64 {
-	backoff = math.Min(backoff*2, CAP)
-	return rand.Float64() * backoff
-}
+*/
 
 func filterPeers(peers []*memberlist.Node, remove ...string) []*memberlist.Node {
 	var nodes []*memberlist.Node
@@ -313,4 +305,11 @@ func filterPeers(peers []*memberlist.Node, remove ...string) []*memberlist.Node 
 
 func deconstructRecipeUploadRequest(req *pb.RecipeUploadRequest) (string, string) {
 	return req.GetFilename(), string(req.GetContent())
+}
+
+// BackoffWithJitter calculates a random jittered backoff value
+// Is public, so that remote functions can access it.
+func BackoffWithJitter(backoff float64, maxValue float64) float64 {
+	backoff = backoff * 2
+	return math.Min(rand.Float64()*backoff, maxValue)
 }

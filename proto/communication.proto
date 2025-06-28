@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/stahlco/ch3fs/proto/communication";
+option go_package = "github.com/stahlco/ch3fs/proto";
 
 service FileSystem {
   // Dummy Function ≈ echo + "Receiver Server"
@@ -33,12 +33,10 @@ message RecipeUploadRequest {
   string id = 1;
   string filename = 2;
   bytes content = 3;
-  repeated string seen = 4;
 }
 
 message UploadResponse {
   bool success = 1;
-  repeated string seen = 2;
 }
 
 message RecipeChunk {
@@ -58,7 +56,6 @@ message RecipeDownloadResponse {
 // For now only the seen list can be updated!
 message RecipeUpdateRequest {
   string id = 1;
-  repeated string seen = 2;
 }
 
 message UpdateResponse {

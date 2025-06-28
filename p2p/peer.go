@@ -5,10 +5,7 @@ import (
 	"ch3fs/storage"
 	"fmt"
 	"github.com/hashicorp/memberlist"
-	"github.com/hashicorp/raft"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -28,56 +25,18 @@ type Peer struct {
 	MemberlistPort int
 
 	//Information about the system
-	Peers *memberlist.Memberlist
-	Raft  *raft.Raft
+	Peers    *memberlist.Memberlist
+	RaftNode *RaftNode
 }
 
-type CH3FSM struct {
-	storage *storage.Store
-}
-
-type Snapshot struct{}
-
-type RaftCommand struct {
-	Upload pb.RecipeUploadRequest //Data inside the command e.g. recipe
-}
-
-// Broadcasting of UploadRequests among the RaftNodes
-// The are only Upload and Download => only Upload is broadcasted
-// log.Data = RecipeUploadRequest
-func (f *CH3FSM) Apply(log *raft.Log) interface{} {
-
-	var uploadReq pb.RecipeUploadRequest
-	err := proto.Unmarshal(log.Data, &uploadReq)
-	if err != nil {
-		fmt.Errorf("failed to unmarshal raft command")
-		return nil
-	}
-	err := f.storage.StoreRecipe(ctx)
-
-}
-
-func (f *CH3FSM) Snapshot() (raft.FSMSnapshot, error) {
-	return &Snapshot{}, nil
-}
-
-func (f *CH3FSM) Restore(rc io.ReadCloser) error {
-	return nil
-}
-
-func (s *Snapshot) Persist(_ raft.SnapshotSink) error {
-	return nil
-}
-func (s *Snapshot) Release() {}
-
-func NewPeer(list *memberlist.Memberlist) *Peer {
+func NewPeer(list *memberlist.Memberlist, raft *RaftNode) *Peer {
 	s := grpc.NewServer()
 
 	// Create unique database
 	hostname, _ := os.Hostname()
 	path := filepath.Join("/storage", fmt.Sprintf("%s_bbolt.db", hostname))
 
-	service := NewFileServer(storage.NewStore(path, 0600))
+	service := NewFileServer(storage.NewStore(path, 0600), raft, list)
 	pb.RegisterFileSystemServer(s, service)
 
 	// Returns 172.0. ... :7946 but we want 8080
@@ -94,6 +53,7 @@ func NewPeer(list *memberlist.Memberlist) *Peer {
 		GrpcPort:       8080,
 		MemberlistPort: 7946,
 		Peers:          list,
+		RaftNode:       raft,
 	}
 }
 
@@ -125,5 +85,14 @@ func ListContains(l *memberlist.Memberlist, node *memberlist.Node) bool {
 		}
 	}
 
+	return false
+}
+
+func ListContainsContainerName(l *memberlist.Memberlist, container string) bool {
+	for _, m := range l.Members() {
+		if m.Name == container {
+			return true
+		}
+	}
 	return false
 }
