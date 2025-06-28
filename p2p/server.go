@@ -6,8 +6,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/golang/protobuf/proto"
+	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"log"
 	"math"
 	"math/rand"
 	"os"
@@ -52,11 +56,18 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	if req == nil {
-		return &pb.UploadResponse{Success: false}, fmt.Errorf("request cannot be nil")
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("UploadResponse was nil")
 	}
 
 	if fs.Raft.Raft.State() != raft.Leader {
-		return &pb.UploadResponse{Success: false}, fmt.Errorf("not the leader")
+		serverAddress, _ := fs.Raft.Raft.LeaderWithID()
+		conn, err := grpc.NewClient(string(serverAddress), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("Creating New Client failed!")
+		}
+		defer conn.Close()
+		client := pb.NewFileSystemClient(conn)
+		return client.UploadRecipe(ctx, req)
 	}
 
 	// serializing request for raft consensus
@@ -77,6 +88,38 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	return &pb.UploadResponse{Success: false}, nil
+}
+
+func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
+
+	//Check for bad param
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if req == nil {
+		return &pb.RecipeDownloadResponse{
+			Success: false,
+		}, fmt.Errorf("DownloadRequest was nil")
+	}
+
+	//Parsing string -> UUID
+	id, err := uuid.Parse(req.GetRecipeId())
+	if err != nil {
+		log.Printf("Invalid UUID: %v", err)
+		return nil, err
+	}
+
+	recipe, err := fs.Store.GetRecipe(ctx, id)
+	if err != nil {
+		log.Printf("DownloadRecipe failed with %s", err)
+		return nil, err
+	}
+
+	return &pb.RecipeDownloadResponse{
+		Success:  true,
+		Filename: recipe.Filename,
+		Content:  []byte(recipe.Content),
+	}, nil
 }
 
 /*
@@ -134,9 +177,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	return &pb.UploadResponse{Success: true, Seen: seen}, nil
 }
 
-func (fs FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
-	return nil, nil
-}
+
 // Helper Functions
 
 func (fs *FileServer) broadcastUpload(originalReq *pb.RecipeUploadRequest, seen []string) error {

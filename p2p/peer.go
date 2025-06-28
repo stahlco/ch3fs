@@ -1,15 +1,11 @@
 package p2p
 
 import (
-	pb "ch3fs/proto"
-	"ch3fs/storage"
 	"fmt"
 	"github.com/hashicorp/memberlist"
 	"google.golang.org/grpc"
 	"log"
 	"net"
-	"os"
-	"path/filepath"
 )
 
 type Peer struct {
@@ -29,6 +25,7 @@ type Peer struct {
 	RaftNode *RaftNode
 }
 
+/*
 func NewPeer(list *memberlist.Memberlist, raft *RaftNode) *Peer {
 	s := grpc.NewServer()
 
@@ -56,6 +53,8 @@ func NewPeer(list *memberlist.Memberlist, raft *RaftNode) *Peer {
 		RaftNode:       raft,
 	}
 }
+
+*/
 
 func (p *Peer) Start() error {
 

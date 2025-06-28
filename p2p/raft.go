@@ -41,7 +41,7 @@ type RaftNode struct {
 	TransportManager *transport.Manager
 }
 
-func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist, raftID string, raftAddr string) (*RaftNode, error) {
+func NewRaftWithReplicaDiscovery(ctx context.Context, ml *memberlist.Memberlist, raftID string, raftAddr string) (*RaftNode, error) {
 
 	c := raft.DefaultConfig()
 	c.LocalID = raft.ServerID(raftID)
