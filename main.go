@@ -30,8 +30,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
+
 	fileServer := p2p.NewFileServer(persistentStore, node)
-	
+
 	//starting gRPC server functionality, enables test client to reach a node on port 8080
 	lis, err := net.Listen("tcp", ":8080")
 	grpcServer := grpc.NewServer()

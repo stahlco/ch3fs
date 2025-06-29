@@ -17,7 +17,7 @@ services:
   client:
     build:
       context: .
-      dockerfile: cmd/Dockerfile
+      dockerfile: cmd/docker/Dockerfile
     platform: linux/arm64  # für explizite Plattform (optional, aber empfohlen)
     image: ch3fs-client      # optional, damit der Name gesetzt wird
     networks:

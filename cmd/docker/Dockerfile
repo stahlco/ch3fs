@@ -1,6 +1,8 @@
 FROM golang:1.23 AS build
 WORKDIR /app
-COPY . .
+
+COPY .. .
+
 
 # Statische, portable Binary für Linux ARM64
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /client ./cmd/TestClient.go

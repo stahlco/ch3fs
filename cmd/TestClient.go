@@ -7,13 +7,16 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
+	"os"
 	"time"
 )
 
 const ch3fTarget = "ch3f:8080"
 
 func main() {
+	host, _ := os.Hostname()
 
+	log.Printf("Client started as: ", host)
 	time.Sleep(30 * time.Second)
 	res, id, err := uploadRecipeToRandomReplica()
 
@@ -47,6 +50,9 @@ func uploadRecipeToRandomReplica() (*pb.UploadResponse, string, error) {
 		log.Fatalf("Creating New Client failed!")
 	}
 	defer conn.Close()
+
+	log.Printf("[INFO] Connection established with: %s", conn.Target())
+
 	client := pb.NewFileSystemClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -60,7 +66,10 @@ func uploadRecipeToRandomReplica() (*pb.UploadResponse, string, error) {
 		Content:  []byte("This is the recipe1 description"),
 	}
 
+	log.Printf("[INFO] Upload Recipe with ID: %s", id)
 	res, err2 := client.UploadRecipe(ctx, req)
+
+	log.Printf("[INFO] Received Response: %v", res)
 	return res, id, err2
 }
 
@@ -73,6 +82,8 @@ func downloadRecipeFromRandomReplica(id string) (*pb.RecipeDownloadResponse, err
 		log.Fatalf("Creating New Client failed!")
 	}
 	defer conn.Close()
+	log.Printf("[INFO] Connection established with: %s", conn.Target())
+
 	client := pb.NewFileSystemClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -82,6 +93,7 @@ func downloadRecipeFromRandomReplica(id string) (*pb.RecipeDownloadResponse, err
 		RecipeId: id,
 	}
 
+	log.Printf("[INFO] Download Recipe with ID: %s", id)
 	return client.DownloadRecipe(ctx, req)
 
 }

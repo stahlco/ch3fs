@@ -70,7 +70,7 @@ func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist
 	}
 
 	//creating store for the persistent recipes, stored in each raftNode
-	path := filepath.Join(basePath, fmt.Sprintf("%s_bbolt.db", raftID))
+	path := filepath.Join(basePath, fmt.Sprintf("%s_bbolt1.db", raftID))
 	persistentStore := storage.NewStore(path, 0600)
 
 	tm := transport.New(
@@ -124,7 +124,7 @@ type fsm struct {
 	store *storage.Store
 }
 
-// This function store the accepted log of the majority of the nodes on each fsm
+// Apply This function store the accepted log of the majority of the nodes on each fsm
 // The data is a byte[], which represents a RecipeUploadRequest
 // => we want to sent the RecipeUploadRequest inside the log.data
 func (f fsm) Apply(l *raft.Log) interface{} {
