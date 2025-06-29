@@ -42,7 +42,7 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 				return list, nil
 			}
 		}
-		backoff = p2p.BackoffWithJitter(backoff, 10000)
+		backoff = p2p.BackoffWithJitter(backoff)
 		time.Sleep(time.Duration(backoff) * time.Millisecond)
 	}
 }

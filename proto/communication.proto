@@ -37,6 +37,7 @@ message RecipeUploadRequest {
 
 message UploadResponse {
   bool success = 1;
+  string leaderContainer = 2;
 }
 
 message RecipeChunk {

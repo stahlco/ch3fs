@@ -47,7 +47,7 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*p
 	for {
 		if err != nil {
 			log.Println("Error from server", err)
-			backoff = BackoffWithJitter(backoff, 10000)
+			backoff = BackoffWithJitter(backoff)
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			res, err = client.UploadRecipe(ctx, request)
 			continue
