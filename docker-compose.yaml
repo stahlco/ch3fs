@@ -3,8 +3,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    ports:
-      - "8081-8090:8080"
     restart: unless-stopped
     networks:
       - kitchen
@@ -17,7 +15,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
   client:
-    build: ./cmd
+    build:
+      context: .
+      dockerfile: cmd/Dockerfile
+    platform: linux/arm64  # für explizite Plattform (optional, aber empfohlen)
+    image: ch3fs-client      # optional, damit der Name gesetzt wird
     networks:
       - kitchen
     depends_on:

@@ -1,7 +1,8 @@
-package cmd
+package main
 
 import (
 	pb "ch3fs/proto"
+	"github.com/google/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -13,20 +14,21 @@ const ch3fTarget = "ch3f:8080"
 
 func main() {
 
-	time.Sleep(100)
-	res, err := uploadRecipeToRandomReplica()
+	time.Sleep(30 * time.Second)
+	res, id, err := uploadRecipeToRandomReplica()
 
-	if !res.Success {
+	if err != nil || res == nil || !res.Success {
 		log.Println("Could not write to datastore")
 		log.Printf("error from server: %v", err)
 	} else {
 		log.Println("successfully stored recipe")
 	}
 
-	time.Sleep(50)
+	time.Sleep(5 * time.Second)
 
-	res2, err2 := downloadRecipeFromRandomReplica()
-	if !res2.Success {
+	res2, err2 := downloadRecipeFromRandomReplica(id)
+
+	if err2 != nil || res2 == nil || !res2.Success {
 		log.Println("Could not read from datastore")
 		log.Printf("error from server : %v", err2)
 	} else {
@@ -36,7 +38,7 @@ func main() {
 	select {}
 }
 
-func uploadRecipeToRandomReplica() (*pb.UploadResponse, error) {
+func uploadRecipeToRandomReplica() (*pb.UploadResponse, string, error) {
 
 	log.Println("preparing connection...")
 
@@ -50,16 +52,19 @@ func uploadRecipeToRandomReplica() (*pb.UploadResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	id := uuid.New().String()
+
 	req := &pb.RecipeUploadRequest{
-		Id:       "test-001",
+		Id:       id,
 		Filename: "recipe1.txt",
 		Content:  []byte("This is the recipe1 description"),
 	}
 
-	return client.UploadRecipe(ctx, req)
+	res, err2 := client.UploadRecipe(ctx, req)
+	return res, id, err2
 }
 
-func downloadRecipeFromRandomReplica() (*pb.RecipeDownloadResponse, error) {
+func downloadRecipeFromRandomReplica(id string) (*pb.RecipeDownloadResponse, error) {
 
 	log.Println("preparing connection...")
 
@@ -74,7 +79,7 @@ func downloadRecipeFromRandomReplica() (*pb.RecipeDownloadResponse, error) {
 	defer cancel()
 
 	req := &pb.RecipeDownloadRequest{
-		RecipeId: "test-001",
+		RecipeId: id,
 	}
 
 	return client.DownloadRecipe(ctx, req)

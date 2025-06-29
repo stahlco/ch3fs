@@ -7,11 +7,13 @@ toolchain go1.23.5
 require (
 	github.com/Jille/raft-grpc-transport v1.6.1
 	github.com/docker/docker v28.3.0+incompatible
+	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/memberlist v0.5.3
 	github.com/hashicorp/raft v1.7.3
 	github.com/hashicorp/raft-boltdb v0.0.0-20250616090010-b0f3b5d9e479
 	go.etcd.io/bbolt v1.4.1
+	golang.org/x/net v0.41.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 )
@@ -66,7 +68,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 )
