@@ -12,6 +12,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"net"
 	"slices"
 	"time"
 )
@@ -35,7 +36,7 @@ func NewFileServer(store *storage.Store, raft *RaftNode) *FileServer {
 // UploadRecipe implements the gRPC method for uploading a recipe via Raft consensus.
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
 	// checking context
-	log.Printf("Uploading recipe received: ", req.Filename)
+	log.Printf("Uploading recipe received: %s ", req.Filename)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -45,10 +46,20 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	if fs.Raft.Raft.State() != raft.Leader {
-		serverAddress, _ := fs.Raft.Raft.LeaderWithID()
+
+		_, leaderId := fs.Raft.Raft.LeaderWithID()
+
+		leaders, err := net.LookupIP(string(leaderId))
+		if err != nil || len(leaders) == 0 {
+			log.Printf("could not resolve IP for leader %s: %v", leaderId, err)
+			return &pb.UploadResponse{Success: false}, fmt.Errorf("could not resolve leader host")
+		}
+		leaderIP := leaders[0].String()
+
+		//TODO return the ip address
 		return &pb.UploadResponse{
 			Success:         false,
-			LeaderContainer: string(serverAddress),
+			LeaderContainer: leaderIP,
 		}, nil
 	}
 
@@ -59,7 +70,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	// raft apply, new entry should be appended to log and replicated to every node
-	log.Printf("applying the recipe to raft: ", req.Filename)
+	log.Printf("applying the recipe to raft: %s", req.Filename)
 	applyFuture := fs.Raft.Raft.Apply(data, 5*time.Second)
 	if err := applyFuture.Error(); err != nil {
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("raft apply failed: %w", err)

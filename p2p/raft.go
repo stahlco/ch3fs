@@ -198,7 +198,7 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 				return list, nil
 			}
 		}
-		backoff = BackoffWithJitter(backoff, 10000)
+		backoff = BackoffWithJitter(backoff)
 		time.Sleep(time.Duration(backoff) * time.Millisecond)
 	}
 }

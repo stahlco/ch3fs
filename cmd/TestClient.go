@@ -12,40 +12,43 @@ import (
 )
 
 const ch3fTarget = "ch3f:8080"
+const port = ":8080"
 
 func main() {
 	host, _ := os.Hostname()
 
-	log.Printf("Client started as: ", host)
+	log.Printf("Client started as: %s ", host)
 	time.Sleep(30 * time.Second)
-	res, id, err := uploadRecipeToRandomReplica()
+	uploadRes, recipeId, err := uploadRecipeToReplica(ch3fTarget)
 
-	if err != nil || res == nil || !res.Success {
+	if err != nil || uploadRes == nil {
 		log.Println("Could not write to datastore")
 		log.Printf("error from server: %v", err)
 	} else {
-		log.Println("successfully stored recipe")
+		if !uploadRes.Success {
+			log.Println("did not contact the leader")
+			log.Printf("the current leader is: %v", uploadRes.LeaderContainer)
+			uploadRes, recipeId, err = uploadRecipeToReplica(uploadRes.LeaderContainer + port)
+		}
 	}
 
 	time.Sleep(5 * time.Second)
 
-	res2, err2 := downloadRecipeFromRandomReplica(id)
+	downloadRes, err2 := downloadRecipeFromRandomReplica(recipeId)
 
-	if err2 != nil || res2 == nil || !res2.Success {
+	if err2 != nil || downloadRes == nil || !downloadRes.Success {
 		log.Println("Could not read from datastore")
 		log.Printf("error from server : %v", err2)
 	} else {
-		log.Printf("successfully read recipe: %v, %v\n", res2.Filename, string(res2.Content))
+		log.Printf("successfully read recipe: %v, %v\n", downloadRes.Filename, string(downloadRes.Content))
 	}
 
 	select {}
 }
 
-func uploadRecipeToRandomReplica() (*pb.UploadResponse, string, error) {
+func uploadRecipeToReplica(replica string) (*pb.UploadResponse, string, error) {
 
-	log.Println("preparing connection...")
-
-	conn, err := grpc.NewClient(ch3fTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(replica, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Creating New Client failed!")
 	}
@@ -74,8 +77,6 @@ func uploadRecipeToRandomReplica() (*pb.UploadResponse, string, error) {
 }
 
 func downloadRecipeFromRandomReplica(id string) (*pb.RecipeDownloadResponse, error) {
-
-	log.Println("preparing connection...")
 
 	conn, err := grpc.NewClient(ch3fTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
