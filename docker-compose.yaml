@@ -18,12 +18,17 @@ services:
     build:
       context: .
       dockerfile: cmd/docker/Dockerfile
-    platform: linux/arm64  # für explizite Plattform (optional, aber empfohlen)
-    image: ch3fs-client      # optional, damit der Name gesetzt wird
+    platform: linux/arm64
+    image: ch3fs-client
     networks:
       - kitchen
     depends_on:
       - ch3f
+    deploy:
+      replicas: 10
+      restart_policy:
+        condition: on-failure
+
 
       
 volumes:
