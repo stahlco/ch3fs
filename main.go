@@ -5,6 +5,7 @@ import (
 	pb "ch3fs/proto"
 	"context"
 	"flag"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -17,8 +18,9 @@ var (
 
 func main() {
 	flag.Parse()
+	logger, _ := zap.NewDevelopment()
 
-	ml, err := DiscoverAndJoinPeers()
+	ml, err := p2p.DiscoverAndJoinPeers()
 	if err != nil {
 		log.Fatalf("failed to setup Memberlist: %v", err)
 	}
@@ -26,12 +28,12 @@ func main() {
 	raftID := p2p.GenerateRaftID()
 	ctx := context.Background()
 
-	node, persistentStore, err := p2p.NewRaftWithReplicaDiscorvery(ctx, ml, raftID, ":50051")
+	node, persistentStore, err := p2p.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
 	if err != nil {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
 
-	fileServer := p2p.NewFileServer(persistentStore, node)
+	fileServer := p2p.NewFileServer(persistentStore, node, *logger)
 
 	//starting gRPC server functionality, enables test client to reach a node on port 8080
 	lis, err := net.Listen("tcp", ":8080")

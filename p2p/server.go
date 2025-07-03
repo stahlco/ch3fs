@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
+	"go.uber.org/zap"
 	"log"
 	"math"
 	"math/rand"
@@ -22,11 +23,12 @@ const GRPCPort = 8080
 
 type FileServer struct {
 	pb.FileSystemServer
-	Store *storage.Store
-	Raft  *RaftNode
+	Store  *storage.Store
+	Raft   *RaftNode
+	logger *zap.Logger
 }
 
-func NewFileServer(store *storage.Store, raft *RaftNode) *FileServer {
+func NewFileServer(store *storage.Store, raft *RaftNode, logger zap.Logger) *FileServer {
 	return &FileServer{
 		Store: store,
 		Raft:  raft,
@@ -137,4 +139,13 @@ func deconstructRecipeUploadRequest(req *pb.RecipeUploadRequest) (string, string
 func BackoffWithJitter(backoff float64) float64 {
 	backoff = backoff * 2
 	return math.Min(rand.Float64()*backoff, CAP)
+}
+
+func ListContainsContainerName(l *memberlist.Memberlist, container string) bool {
+	for _, m := range l.Members() {
+		if m.Name == container {
+			return true
+		}
+	}
+	return false
 }

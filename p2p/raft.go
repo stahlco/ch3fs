@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
 	rbolt "github.com/hashicorp/raft-boltdb"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -39,9 +40,15 @@ var (
 type RaftNode struct {
 	Raft             *raft.Raft
 	TransportManager *transport.Manager
+	logger           *zap.Logger
 }
 
-func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist, raftID string, raftAddr string) (*RaftNode, *storage.Store, error) {
+func NewRaftWithReplicaDiscovery(
+	ctx context.Context,
+	ml *memberlist.Memberlist,
+	raftID string,
+	raftAddr string,
+	logger *zap.Logger) (*RaftNode, *storage.Store, error) {
 
 	c := raft.DefaultConfig()
 	c.LocalID = raft.ServerID(raftID)
@@ -51,7 +58,7 @@ func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist
 		return nil, nil, fmt.Errorf("creating basePath dir failed: %v", err)
 	}
 
-	log.Printf("[TRACE] basePath for raft databases create as: %s", basePath)
+	logger.Debug("basePath for raft databases created", zap.String("basePath", basePath))
 
 	logDb, err := rbolt.NewBoltStore(filepath.Join(basePath, "logs.db"))
 	if err != nil {
@@ -86,15 +93,16 @@ func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist
 		return nil, nil, fmt.Errorf("failed to listen on %s: %v", raftAddr, err)
 	}
 	go func() {
-		log.Printf("gRPC Raft server listening on %s", raftAddr)
+		logger.Info("gRPC Raft server listening", zap.String("address", raftAddr))
 		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("gRPC Serve failed: %v", err)
+			logger.Fatal("gRPC Serve failed", zap.Error(err))
 		}
 	}()
 
 	// Might change that later
 	fsm := fsm{
-		store: persistentStore,
+		store:  persistentStore,
+		logger: logger,
 	}
 
 	ra, err := raft.NewRaft(c, fsm, logDb, stableDb, snapStore, tm.Transport())
@@ -105,23 +113,25 @@ func NewRaftWithReplicaDiscorvery(ctx context.Context, ml *memberlist.Memberlist
 	if shouldBootstrap(ra) {
 		go func() {
 			if err := coordinateBootstrap(ra, ml); err != nil {
-				log.Printf("Bootstrap coordination failed: %v", err)
+				logger.Error("Bootstrap coordination failed", zap.Error(err))
 			}
 		}()
 	} else {
-		log.Printf("Existing Raft state found, skipping bootstrap")
+		logger.Info("Existing Raft state found, skipping bootstrap")
 	}
 
 	return &RaftNode{
 			Raft:             ra,
 			TransportManager: tm,
+			logger:           logger,
 		},
 		persistentStore,
 		nil
 }
 
 type fsm struct {
-	store *storage.Store
+	store  *storage.Store
+	logger *zap.Logger
 }
 
 // Apply This function store the accepted log of the majority of the nodes on each fsm
@@ -132,14 +142,14 @@ func (f fsm) Apply(l *raft.Log) interface{} {
 	var request pb.RecipeUploadRequest
 	err := proto.Unmarshal(l.Data, &request)
 	if err != nil {
-		log.Printf("Unmarshal of log.Data failed: %v", err)
+		f.logger.Error("Unmarshal of log.Data failed", zap.Error(err))
 		return &pb.UploadResponse{
 			Success: false,
 		}
 	}
 	id, err := uuid.Parse(request.Id)
 	if err != nil {
-		log.Printf("Invalid UUID: %v", err)
+		f.logger.Error("Invalid UUID", zap.String("id", request.Id), zap.Error(err))
 		return &pb.UploadResponse{
 			Success: false,
 		}
@@ -151,12 +161,13 @@ func (f fsm) Apply(l *raft.Log) interface{} {
 
 	err = f.store.StoreRecipe(ctx, recipe)
 	if err != nil {
-		log.Printf("Store Recipe failed in fsm - apply: %v", err)
+		f.logger.Error("Store Recipe failed in fsm - apply", zap.Error(err))
 		return &pb.UploadResponse{
 			Success: false,
 		}
 	}
-	log.Printf("Successfully applied recipe: %v", recipe.Filename)
+	
+	f.logger.Info("Successfully applied recipe", zap.String("filename", recipe.Filename))
 	return &pb.UploadResponse{
 		Success: true,
 	}

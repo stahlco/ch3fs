@@ -20,8 +20,13 @@ up:
    docker compose up --build --detach --timeout 3
 
 # Spins up/ Shuts down
-scale x:
-   docker compose up --detach --scale ch3f={{x}}
+scale opt x:
+    if [ "{{opt}}" = "client" ]; then \
+    docker compose up --detach --scale client={{x}}; \
+    elif [ "{{opt}}" = "cluster" ]; then \
+    docker compose up --detach --scale ch3f={{x}}; \
+    fi
+
 
 # Shuts down the containers (remove-orphans = Removes any containers created by a previous run, )
 down:

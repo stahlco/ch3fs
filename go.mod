@@ -13,6 +13,7 @@ require (
 	github.com/hashicorp/raft v1.7.3
 	github.com/hashicorp/raft-boltdb v0.0.0-20250616090010-b0f3b5d9e479
 	go.etcd.io/bbolt v1.4.1
+	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.41.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
@@ -67,6 +68,7 @@ require (
 	github.com/miekg/dns v1.1.26 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
