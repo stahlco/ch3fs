@@ -166,7 +166,7 @@ func (f fsm) Apply(l *raft.Log) interface{} {
 			Success: false,
 		}
 	}
-	
+
 	f.logger.Info("Successfully applied recipe", zap.String("filename", recipe.Filename))
 	return &pb.UploadResponse{
 		Success: true,
@@ -184,13 +184,15 @@ func (f fsm) Restore(snapshot io.ReadCloser) error {
 }
 
 func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
+	logger := zap.L()
+
 	list, err := memberlist.Create(memberlist.DefaultLANConfig())
 	if err != nil {
-		log.Fatalf("Creating memberlist with DefaultLANConfig failed with Error: %v", err)
+		logger.Fatal("Creating memberlist with DefaultLANConfig failed", zap.Error(err))
 		return nil, err
 	}
 
-	log.Printf("Node %s startet with Addr: %s", list.LocalNode(), list.LocalNode().Addr)
+	logger.Info("Node started:", zap.String("local name", list.LocalNode().Name), zap.String("memberlist_addr", list.LocalNode().Address()))
 
 	backoff := 50.0
 
@@ -199,13 +201,13 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 		//Docker's Internal DNS Service - returns IPs of all healthy containers in the 'ch3fs' network
 		peerIPs, err := net.LookupHost("ch3f")
 		if err != nil {
-			log.Fatalf("Look up of host in 'ch3fs' failed, with Error: %v", err)
+			logger.Fatal("Look up of host in 'ch3fs' failed", zap.Error(err))
 			return nil, err
 		}
 		if len(peerIPs) > 0 {
 			n, err := list.Join(peerIPs)
 			if err == nil {
-				log.Printf("[INFO] Successfully joint %d nodes", n)
+				logger.Info("Successfully joint nodes", zap.Int("size", n))
 				return list, nil
 			}
 		}
@@ -216,13 +218,13 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 
 func shouldBootstrap(raft *raft.Raft) bool {
 	stats := raft.Stats()
-	log.Printf("[INFO] Raft stats: %v", stats)
 	return stats["last_log_index"] == "0" && stats["last_log_term"] == "0"
 }
 
 func coordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
+	logger := zap.L()
+
 	flag.Parse()
-	log.Printf("Coordinating bootstrap among replicas")
 
 	delay := time.Duration(rand.Intn(20))
 	time.Sleep(delay * time.Second)
@@ -231,7 +233,7 @@ func coordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
 
 	for {
 		if time.Since(start) > *discoveryTimeout {
-			log.Fatalf("Cluster is to slow")
+			logger.Fatal("Cluster is to slow, discovery timeout reached")
 		}
 
 		if len(ml.Members()) >= InitialClusterSize {
@@ -256,7 +258,7 @@ func coordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
 	isBootstrapper := leader.Name == ml.LocalNode().Name
 
 	if isBootstrapper {
-		log.Printf("This node is the bootstrap leader, initializing cluster")
+		logger.Info("Local node is the bootstrap leader, init cluster")
 
 		var servers []raft.Server
 
@@ -276,10 +278,9 @@ func coordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
 		if err = f.Error(); err != nil {
 			return fmt.Errorf("bootstrapping cluster failed with error: %v", err)
 		}
-
-		log.Printf("Successfully bootstrapped cluster with %d servers", len(servers))
+		logger.Info("Successfully bootstrapped cluster", zap.Int("size", len(servers)))
 	} else {
-		log.Printf("This node is not the bootstrap leader, waiting for cluster init")
+		logger.Info("Local node is not the bootstrap leader, waiting for cluster init")
 	}
 
 	timeout := time.After(30 * time.Second)
@@ -295,7 +296,7 @@ func coordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
 			laddr, lid := ra.LeaderWithID()
 
 			if laddr != "" && lid != "" {
-				log.Printf("Cluster bootstrap completed, leader detected with LeaderID: %s and LeaderAddr: %s", lid, laddr)
+				logger.Info("Cluster bootstrap completed, leader detected", zap.Any("LeaderID", lid), zap.Any("LeaderAddr", laddr))
 				return nil
 			}
 
@@ -303,15 +304,13 @@ func coordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
 			if err = future.Error(); err != nil {
 				cfg := future.Configuration()
 				if len(cfg.Servers) > 0 {
-					log.Printf("Cluster configuration available with %d servers", len(cfg.Servers))
+					logger.Info("Cluster config available", zap.Int("cfg server size", len(cfg.Servers)))
 					return nil
 				}
 			}
 
 		}
 	}
-
-	return nil
 }
 
 type NodeInformation struct {
@@ -320,6 +319,7 @@ type NodeInformation struct {
 }
 
 func getNodeInformation(ml *memberlist.Memberlist) ([]NodeInformation, error) {
+	logger := zap.L()
 	cli, err := client.NewClientWithOpts(
 		client.WithHost("unix:///var/run/docker.sock"),
 		client.WithVersion("1.47"),
@@ -348,7 +348,7 @@ func getNodeInformation(ml *memberlist.Memberlist) ([]NodeInformation, error) {
 
 		startTime, err := time.Parse(time.RFC3339Nano, inspect.State.StartedAt)
 		if err != nil {
-			log.Printf("Failed to parse startup time for container %s: %v", containerName, err)
+			logger.Info("Failed to parse startup time for container", zap.String("container_name", containerName), zap.Error(err))
 			startupTimes[containerName] = time.Now()
 			continue
 		}
@@ -361,6 +361,7 @@ func getNodeInformation(ml *memberlist.Memberlist) ([]NodeInformation, error) {
 	for _, m := range ml.Members() {
 		startTime, exists := startupTimes[m.Name]
 		if !exists {
+			logger.Warn("No start time found for container", zap.String("container_name", m.Name))
 			log.Printf("[WARN] No start time found for container %s", m.Name)
 			startTime = time.Now()
 		}
