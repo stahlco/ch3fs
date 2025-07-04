@@ -5,36 +5,32 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"log"
 	"time"
 )
 
 type Client struct {
 	server *FileServer
+	logger *zap.SugaredLogger
 }
 
-func NewClient(server *FileServer) *Client {
+func NewClient(server *FileServer, logger *zap.SugaredLogger) *Client {
 	return &Client{
 		server: server,
+		logger: logger,
 	}
 }
 
-//TODO file check <1mb
-
-type DummyRequest struct {
-	msg string
-}
-
-func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
-	log.Println("preparing connection...")
-
+func (c *Client) SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Creating New Client failed!")
+		c.logger.Errorf("failed to connect to target %s: %v %", target, err)
+		return nil, err
 	}
 	defer conn.Close()
+
 	client := pb.NewFileSystemClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -46,16 +42,17 @@ func SendRecipeUploadRequest(target string, request *pb.RecipeUploadRequest) (*p
 	backoff := 50.0
 	for {
 		if err != nil {
-			log.Println("Error from server", err)
+			c.logger.Errorf("error from server: %v", err)
 			backoff = BackoffWithJitter(backoff)
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			res, err = client.UploadRecipe(ctx, request)
 			continue
 		}
+		break
 	}
 
-	if !res.Success {
-		log.Println("Could not write to datastore")
+	if res != nil && !res.Success {
+		c.logger.Warnf("could not write to server")
 		return nil, nil
 	}
 
@@ -76,27 +73,8 @@ func ConstructRecipeUploadRequest() pb.RecipeUploadRequest {
 	recipeDesc := fmt.Sprintf("This is the recipe%d´s description", fileIdCounter)
 	content = []byte(recipeDesc)
 	count++
-	return pb.RecipeUploadRequest{Filename: filename, Content: content}
-}
-
-func SendDummyRequest(target string, request *pb.DummyTestRequest) {
-	log.Println("preparing connection...")
-
-	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return
+	return pb.RecipeUploadRequest{
+		Filename: filename,
+		Content:  content,
 	}
-	defer conn.Close()
-
-	client := pb.NewFileSystemClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	res, err := client.DummyTest(ctx, request)
-	if err != nil {
-		log.Println("Error from server", err)
-		return
-	}
-	log.Printf("Successfully sent DummyRequest, response: %s \n", res)
 }

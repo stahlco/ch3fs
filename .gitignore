@@ -38,3 +38,6 @@ bin
 
 # Generated gRPC Stubs
 *.pb.go
+
+# Removing compose
+compose

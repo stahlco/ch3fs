@@ -33,12 +33,11 @@ message RecipeUploadRequest {
   string id = 1;
   string filename = 2;
   bytes content = 3;
-  repeated string seen = 4;
 }
 
 message UploadResponse {
   bool success = 1;
-  repeated string seen = 2;
+  string leaderContainer = 2;
 }
 
 message RecipeChunk {
@@ -51,14 +50,14 @@ message RecipeDownloadRequest {
 }
 
 message RecipeDownloadResponse {
-  string filename = 1;
-  bytes content = 2;
+  bool success = 1;
+  string filename = 2;
+  bytes content = 3;
 }
 
 // For now only the seen list can be updated!
 message RecipeUpdateRequest {
   string id = 1;
-  repeated string seen = 2;
 }
 
 message UpdateResponse {

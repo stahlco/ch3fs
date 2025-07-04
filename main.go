@@ -2,9 +2,13 @@ package main
 
 import (
 	"ch3fs/p2p"
+	pb "ch3fs/proto"
 	"context"
 	"flag"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"log"
+	"net"
 	"time"
 )
 
@@ -14,6 +18,7 @@ var (
 
 func main() {
 	flag.Parse()
+	logger, _ := zap.NewDevelopment()
 
 	ml, err := p2p.DiscoverAndJoinPeers()
 	if err != nil {
@@ -23,16 +28,23 @@ func main() {
 	raftID := p2p.GenerateRaftID()
 	ctx := context.Background()
 
-	node, err := p2p.NewRaftWithReplicaDiscorvery(ctx, ml, raftID, ":50051")
+	node, persistentStore, err := p2p.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
 	if err != nil {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
 
-	// TestDummy: Testing the Functionality of the DummyFunction service!
-	//go TestDummy(list)
+	fileServer := p2p.NewFileServer(persistentStore, node, *logger)
 
-	//TestRecipeUpload: Testing the Functionality of the RecipeUpload service!
-	//go TestUploadRecipe(list)
+	//starting gRPC server functionality, enables test client to reach a node on port 8080
+	lis, err := net.Listen("tcp", ":8080")
+	grpcServer := grpc.NewServer()
+
+	pb.RegisterFileSystemServer(grpcServer, fileServer)
+
+	log.Printf("gRPC FileServer listening on :8080")
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("gRPC Serve failed: %v", err)
+	}
 
 	//Background routine which prints the memberlist
 	go func() {
