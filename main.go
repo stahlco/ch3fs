@@ -28,7 +28,7 @@ func main() {
 	raftID := p2p.GenerateRaftID()
 	ctx := context.Background()
 
-	node, persistentStore, err := p2p.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
+	node, persistentStore, err := p2p.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051", logger)
 	if err != nil {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
