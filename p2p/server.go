@@ -88,7 +88,6 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 }
 
 func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
-
 	//Check for bad param
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -102,7 +101,7 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 	//Parsing string -> UUID
 	id, err := uuid.Parse(req.GetRecipeId())
 	if err != nil {
-		log.Printf("Invalid UUID: %v", err)
+		fs.logger.Error("Invalid UUID received", zap.Any("uuid", id), zap.Error(err))
 		return nil, err
 	}
 

@@ -29,7 +29,7 @@ import (
 
 const (
 	RPort              = 50051
-	InitialClusterSize = 10
+	InitialClusterSize = 3
 )
 
 var (

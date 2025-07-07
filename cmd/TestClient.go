@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,7 +18,7 @@ import (
 const (
 	port            = ":8080"
 	ch3fTarget      = "ch3f" + port
-	rps             = 200
+	rps             = 150
 	testDuration    = 10 * time.Second // How long to run the benchmark
 	uploadCount     = 10
 	benchmarkClient = true
@@ -51,19 +52,37 @@ func main() {
 
 	// Start rate-limited benchmark
 	log.Printf("[INFO] Starting download benchmark: %d requests/sec for %s", rps, testDuration)
+
 	ticker := time.NewTicker(time.Second / time.Duration(rps))
 	defer ticker.Stop()
 
-	var wg sync.WaitGroup
-	stopTime := time.Now().Add(testDuration)
+	var (
+		wg           sync.WaitGroup
+		stopTime     = time.Now().Add(testDuration)
+		latencies    []time.Duration
+		latenciesMu  sync.Mutex
+		successCount int64
+		failureCount int64
+	)
 
 	for time.Now().Before(stopTime) {
 		<-ticker.C
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			start := time.Now()
+
 			id := recipeIDs[rand.Intn(uploadCount)]
 			res, err := downloadRecipe(id)
+
+			duration := time.Since(start)
+
+			// Store latency
+			latenciesMu.Lock()
+			latencies = append(latencies, duration)
+			latenciesMu.Unlock()
+
+			// Track result
 			if err != nil || res == nil || !res.Success {
 				atomic.AddInt64(&failureCount, 1)
 			} else {
@@ -71,12 +90,32 @@ func main() {
 			}
 		}()
 	}
+
 	wg.Wait()
 
+	// Calculate average and 99th percentile
+	latenciesMu.Lock()
+	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+
+	var total time.Duration
+	for _, l := range latencies {
+		total += l
+	}
+	average := total / time.Duration(len(latencies))
+
+	percentile99 := latencies[int(float64(len(latencies))*0.99)]
+	latenciesMu.Unlock()
+
+	// Log final metrics
 	log.Printf("[RESULT] Success: %d | Failures: %d | Total: %d",
 		successCount, failureCount, successCount+failureCount)
+
 	log.Printf("[RESULT] Success Rate: %.2f%%",
 		float64(successCount)*100/float64(successCount+failureCount))
+
+	log.Printf("[RESULT] Average Latency: %s | 99th Percentile Latency: %s",
+		average, percentile99)
+
 }
 
 func uploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, string, error) {
@@ -87,7 +126,7 @@ func uploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, 
 	defer conn.Close()
 
 	client := pb.NewFileSystemClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	id := uuid.New().String()
