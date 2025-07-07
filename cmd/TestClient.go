@@ -7,112 +7,112 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
+	"math/rand"
 	"os"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const ch3fTarget = "ch3f" + port
-const port = ":8080"
+const (
+	port            = ":8080"
+	ch3fTarget      = "ch3f" + port
+	rps             = 200
+	testDuration    = 10 * time.Second // How long to run the benchmark
+	uploadCount     = 10
+	benchmarkClient = true
+)
+
+var successCount int64
+var failureCount int64
 
 func main() {
 	host, _ := os.Hostname()
+	time.Sleep(10 * time.Second)
+	log.Printf("[INFO] Benchmark client started on: %s", host)
 
-	//waiting, until cluster of peers is built
-	time.Sleep(30 * time.Second)
-	log.Printf("Client started as: %s", host)
+	recipeNames := getFileNames(host)
+	contents := getContents()
+	var recipeIDs [uploadCount]string
 
-	var ids [10]string
-	var recipeNames = getFileNames(host)
-	var contents = getContents()
-
-	//Uploading all 10 files
-	for i := 0; i < 10; i++ {
-		res, recipeId, err := uploadRecipeToReplica(ch3fTarget, recipeNames[i], []byte(contents[i]))
+	// Upload initial recipes
+	for i := 0; i < uploadCount; i++ {
+		res, id, err := uploadRecipe(ch3fTarget, recipeNames[i], []byte(contents[i]))
 		if err != nil || res == nil {
-			log.Printf("[ERROR] Failed to upload recipe: %s", err)
+			log.Printf("[ERROR] Upload failed: %v", err)
 			continue
 		}
 		if !res.Success {
-			log.Printf("[INFO] Upload did not contact leader")
-			log.Printf("[INFO] Redirecting to leader: %s", res.LeaderContainer)
-			res, recipeId, err = uploadRecipeToReplica(res.LeaderContainer+port, recipeNames[i], []byte(contents[i]))
+			res, id, err = uploadRecipe(res.LeaderContainer+port, recipeNames[i], []byte(contents[i]))
 		}
-		ids[i] = recipeId
+		recipeIDs[i] = id
 	}
+	time.Sleep(10 * time.Second)
 
-	//Waiting for the uploads to be done
-	time.Sleep(15 * time.Second)
+	// Start rate-limited benchmark
+	log.Printf("[INFO] Starting download benchmark: %d requests/sec for %s", rps, testDuration)
+	ticker := time.NewTicker(time.Second / time.Duration(rps))
+	defer ticker.Stop()
 
-	for i := 0; i < 10; i++ {
-		downloadRes, err2 := downloadRecipeFromRandomReplica(ids[i])
-		if err2 != nil || downloadRes == nil || !downloadRes.Success {
-			log.Printf("[INFO] Could Not download recipe with id: %s", ids[i])
-			log.Printf("[Error] At downloading recipe: %v", err2)
-		} else {
-			log.Printf("[SUCCESS]: Downloaded Recipe. Name: %v, content:%v\n", downloadRes.Filename, string(downloadRes.Content))
-		}
+	var wg sync.WaitGroup
+	stopTime := time.Now().Add(testDuration)
+
+	for time.Now().Before(stopTime) {
+		<-ticker.C
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			id := recipeIDs[rand.Intn(uploadCount)]
+			res, err := downloadRecipe(id)
+			if err != nil || res == nil || !res.Success {
+				atomic.AddInt64(&failureCount, 1)
+			} else {
+				atomic.AddInt64(&successCount, 1)
+			}
+		}()
 	}
+	wg.Wait()
 
-	//select {}
+	log.Printf("[RESULT] Success: %d | Failures: %d | Total: %d",
+		successCount, failureCount, successCount+failureCount)
+	log.Printf("[RESULT] Success Rate: %.2f%%",
+		float64(successCount)*100/float64(successCount+failureCount))
 }
 
-func uploadRecipeToReplica(target string, fileName string, content []byte) (*pb.UploadResponse, string, error) {
-
-	log.Printf("[INFO] starting uploading file: %s", fileName)
-
+func uploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, string, error) {
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Creating New Client failed!")
+		return nil, "", err
 	}
 	defer conn.Close()
 
-	log.Printf("[INFO] Connection established with: %s", conn.Target())
-
 	client := pb.NewFileSystemClient(conn)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	id := uuid.New().String()
-
 	req := &pb.RecipeUploadRequest{
 		Id:       id,
-		Filename: fileName,
+		Filename: filename,
 		Content:  content,
 	}
-
-	log.Printf("[INFO] Upload Recipe with ID: %s and name: %s", id, req.Filename)
 	res, err := client.UploadRecipe(ctx, req)
-	log.Printf("[INFO] Received Response: %v", res)
-	if err != nil || res == nil {
-		log.Printf("[ERROR] Could not upload file with id: %s", id)
-		log.Printf("[Error] Upload error: %v", err)
-		return nil, "", err
-	}
-	return res, id, nil
+	return res, id, err
 }
 
-func downloadRecipeFromRandomReplica(id string) (*pb.RecipeDownloadResponse, error) {
-
+func downloadRecipe(id string) (*pb.RecipeDownloadResponse, error) {
 	conn, err := grpc.NewClient(ch3fTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Creating New Client failed!")
+		return nil, err
 	}
 	defer conn.Close()
-	log.Printf("[INFO] Connection established with: %s", conn.Target())
 
 	client := pb.NewFileSystemClient(conn)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req := &pb.RecipeDownloadRequest{
-		RecipeId: id,
-	}
-
-	log.Printf("[INFO] Download Recipe with ID: %s", id)
+	req := &pb.RecipeDownloadRequest{RecipeId: id}
 	return client.DownloadRecipe(ctx, req)
-
 }
 
 func getFileNames(host string) [10]string {
@@ -123,7 +123,6 @@ func getFileNames(host string) [10]string {
 		"beef_tacos_" + host + ".txt",
 		"quinoa_salad_" + host + ".txt",
 		"avocado_toast_" + host + ".txt",
-
 		"spaghetti_carbonara_" + host + ".txt",
 		"berry_smoothie_" + host + ".txt",
 		"grilled_cheese_" + host + ".txt",
