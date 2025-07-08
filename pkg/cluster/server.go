@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	_ "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -26,13 +28,15 @@ type FileServer struct {
 	Store  *storage.Store
 	Raft   *RaftNode
 	logger *zap.Logger
+	Cache  *lru.ARCCache //Cache, that tracks recent usage
 }
 
-func NewFileServer(raft *RaftNode, logger *zap.Logger) *FileServer {
+func NewFileServer(raft *RaftNode, logger *zap.Logger, cache *lru.ARCCache) *FileServer {
 	return &FileServer{
 		Store:  raft.Store,
 		logger: logger,
 		Raft:   raft,
+		Cache:  cache,
 	}
 }
 
@@ -179,7 +183,7 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		return nil, fmt.Errorf("not able to get CPU data: %v", err)
 	}
 
-	//Probablistic Load Shedding
+	//Probabilistic Load Shedding
 	if usage[0] > 95 && rand.Intn(4)%4 == 0 {
 		fs.logger.Info("Upload Request will be shedded based on cpu treshold and probablistic", zap.Float64("treshold", usage[0]))
 		return &pb.RecipeDownloadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
@@ -202,7 +206,21 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		return nil, err
 	}
 
-	//Add Cache
+	//Checking, if the recipe is cached
+	cachedValueRaw, isInCache := fs.Cache.Get(req.RecipeId)
+	if isInCache {
+		recipe, succ := cachedValueRaw.(*storage.Recipe)
+		if succ {
+			fs.logger.Info("Successfully downloaded recipe out of cache")
+			return &pb.RecipeDownloadResponse{
+				Success:  true,
+				Filename: recipe.Filename,
+				Content:  []byte(recipe.Content),
+			}, nil
+		} else {
+			fs.logger.Error("Could not parse Recipe in cache")
+		}
+	}
 
 	//If Cache Miss, do a Load Shed -> Measure metrics again, and check the remaining time
 
@@ -211,6 +229,10 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		log.Printf("DownloadRecipe failed with %s", err)
 		return nil, err
 	}
+
+	//Adding recipe to cache
+	//if the cache is full, the least recently used is deleted automatically
+	fs.Cache.Add(recipe.RecipeId, recipe)
 
 	return &pb.RecipeDownloadResponse{
 		Success:  true,

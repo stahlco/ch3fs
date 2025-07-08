@@ -5,6 +5,7 @@ import (
 	pb "ch3fs/proto"
 	"context"
 	"flag"
+	lru "github.com/hashicorp/golang-lru"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"log"
@@ -33,7 +34,12 @@ func main() {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
 
-	fileServer := cluster.NewFileServer(node, logger)
+	cache, err := lru.NewARC(128)
+	if err != nil {
+		log.Fatalf("Failed to create cache: %v", err)
+	}
+
+	fileServer := cluster.NewFileServer(node, logger, cache)
 
 	//starting gRPC server functionality, enables test client to reach a node on port 8080
 	lis, err := net.Listen("tcp", ":8080")
