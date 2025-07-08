@@ -58,15 +58,15 @@ just scale client 25
 ---
 ### Requirements
 
-1. **The Application must manage some kind of state**: \
+1. **The Application must manage some kind of state**: 
 
    The system persistently stores recipes using `BboltDB`. Since the architecture is optimized for read-heavy workloads, only the leader node is allowed to handle write operations. Each write is broadcast to all nodes, ensuring that every node maintains an up-to-date copy of the data. This allows any node to serve read requests independently, without requiring quorum or consensus from other nodes
  
-2. **The Application needs to able to scale vertically and horizontally**: \
+2. **The Application needs to able to scale vertically and horizontally**: 
 
    The cluster is designed for easy configuration of the cluster size, which needs a architecture with focus on scalability. We achieve this leveraging `Docker Swarm` components within a `docker-compose` setup.
    It can be **scaled in our out at runtime** (see Section _Scale Cluster at Runtime_) with minimal effort of the user. This version of the system only allows horizontal scalability only on a single machine, because we use for this sandbox environment a single docker network.
-   So please consider that performance may decrease on certain machines due to increased communication overhead between nodes when scaled out. \
+   So please consider that performance may decrease on certain machines due to increased communication overhead between nodes when scaled out. 
    
    New nodes are **automatically discovered** via `hashicorp/memberlist`, which is straightforward thanks the built-in DNS service of `docker`. New nodes are seamlessly integrated into the Raft cluster.
 
