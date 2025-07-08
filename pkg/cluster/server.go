@@ -71,6 +71,10 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 		return nil, err
 	}
 
+	if req == nil {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("UploadResponse was nil")
+	}
+
 	//CPU Information for Load Shedding
 	usage, err := cpu.Percent(time.Second, false)
 	if err != nil {
@@ -99,10 +103,6 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
-	if req == nil {
-		return &pb.UploadResponse{Success: false}, fmt.Errorf("UploadResponse was nil")
-	}
-
 	if fs.Raft.Raft.State() != raft.Leader {
 
 		_, leaderId := fs.Raft.Raft.LeaderWithID()
@@ -114,7 +114,6 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 		}
 		leaderIP := leaders[0].String()
 
-		//TODO return the ip address
 		return &pb.UploadResponse{
 			Success:         false,
 			LeaderContainer: leaderIP,
@@ -137,6 +136,16 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	// response from fsm apply, can be nil or a UploadResponse
 	log.Printf("response of upload %s : %v", req.Filename, applyFuture.Response())
 	if resp, ok := applyFuture.Response().(*pb.UploadResponse); ok {
+
+		id, err := uuid.Parse(req.Id)
+		if err != nil {
+			fs.logger.Error("Failed to parse UUID", zap.Error(err))
+		}
+		fs.Cache.Add(req.Filename, storage.Recipe{
+			RecipeId: id,
+			Filename: req.Filename,
+			Content:  string(req.Content),
+		})
 		return resp, nil
 	}
 
