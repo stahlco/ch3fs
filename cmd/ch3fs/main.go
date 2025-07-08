@@ -1,7 +1,7 @@
 package main
 
 import (
-	"ch3fs/p2p"
+	"ch3fs/pkg/cluster"
 	pb "ch3fs/proto"
 	"context"
 	"flag"
@@ -20,20 +20,20 @@ func main() {
 	flag.Parse()
 	logger, _ := zap.NewDevelopment()
 
-	ml, err := p2p.DiscoverAndJoinPeers()
+	ml, err := cluster.DiscoverAndJoinPeers()
 	if err != nil {
 		log.Fatalf("failed to setup Memberlist: %v", err)
 	}
 
-	raftID := p2p.GenerateRaftID()
+	raftID := cluster.GenerateRaftID()
 	ctx := context.Background()
 
-	node, persistentStore, err := p2p.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051", logger)
+	node, err := cluster.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
 	if err != nil {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
 
-	fileServer := p2p.NewFileServer(persistentStore, node, *logger)
+	fileServer := cluster.NewFileServer(node, logger)
 
 	//starting gRPC server functionality, enables test client to reach a node on port 8080
 	lis, err := net.Listen("tcp", ":8080")

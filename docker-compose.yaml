@@ -2,12 +2,12 @@ services:
   ch3f:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: cmd/ch3fs/docker/Dockerfile
     restart: unless-stopped
     networks:
       - kitchen
     deploy:
-      replicas: 3
+      replicas: 5
       restart_policy:
         condition: on-failure
     volumes:
@@ -17,7 +17,7 @@ services:
   client:
     build:
       context: .
-      dockerfile: cmd/docker/Dockerfile
+      dockerfile: cmd/testclient/docker/Dockerfile
     platform: linux/arm64
     image: ch3fs-client
     networks:

@@ -18,7 +18,7 @@ import (
 const (
 	port            = ":8080"
 	ch3fTarget      = "ch3f" + port
-	rps             = 150
+	rps             = 225
 	testDuration    = 10 * time.Second // How long to run the benchmark
 	uploadCount     = 10
 	benchmarkClient = true
@@ -126,7 +126,7 @@ func uploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, 
 	defer conn.Close()
 
 	client := pb.NewFileSystemClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	id := uuid.New().String()
