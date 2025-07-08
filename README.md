@@ -58,20 +58,24 @@ just scale client 25
 ---
 ### Requirements
 
-1. **The Application must manage some kind of state**
-   The system stores Recipes persistent in `BboltDB`. Because this system lays heavy focus on writes we allow write only the leader of the cluster.
-   Each write will be broadcasting, to all nodes. So each node holds state and allows reads without the need of quorums or consensus of other nodes.
+1. **The Application must manage some kind of state**: \
+
+   The system persistently stores recipes using `BboltDB`. Since the architecture is optimized for read-heavy workloads, only the leader node is allowed to handle write operations. Each write is broadcast to all nodes, ensuring that every node maintains an up-to-date copy of the data. This allows any node to serve read requests independently, without requiring quorum or consensus from other nodes
  
-2. **The Application needs to able to scale vertically and horizontally**
-   The cluster can be configured with ease, due to our design and replication strategie using `docker swarm` components within `docker compose` setup.
-   The cluster can easily be scaled at runtime (Section [Scale cluster](#Scale Cluster at Runtime), both in and out. 
-   Based on the machine the cluster runs on, it can happen that the cluster performs worse when scaled out, due to the overhead of communication.
-   New Nodes will be discovered by `hashicorp/memberlist` outmatically thanks to the `docker dns` service, and will be added to the raft cluster.
-3. **Mitigation strategies to prevent overloading componentes when scaled out**
+2. **The Application needs to able to scale vertically and horizontally**: \
+
+   The cluster is designed for easy configuration of the cluster size, which needs a architecture with focus on scalability. We achieve this leveraging `Docker Swarm` components within a `docker-compose` setup.
+   It can be **scaled in our out at runtime** (see Section _Scale Cluster at Runtime_) with minimal effort of the user. This version of the system only allows horizontal scalability only on a single machine, because we use for this sandbox environment a single docker network.
+   So please consider that performance may decrease on certain machines due to increased communication overhead between nodes when scaled out. \
+   
+   New nodes are **automatically discovered** via `hashicorp/memberlist`, which is straightforward thanks the built-in DNS service of `docker`. New nodes are seamlessly integrated into the Raft cluster.
+
+3. **Mitigation strategies to prevent overloading componentes when scaled out**:
+
    Firstly, our architecture prevents that from happening. The only component which could be overloaded is our leader. But we assume that writes happen not frquently (~ A Recipe per minute).
    But we added Several Load Shedding Strategies, ranging from 
    - **Prioritized Load Shedding** where we shed writes at a certain cpu treshold.
-   - **Probabilistic Load Shedding**, which sheds load (reads and writes) based on cpu treshold and probability (80% treshold -> 10% Load will be shedded).
+   - **Probabilistic Load Shedding**, which sheds load (reads and writes) based on cpu treshold and probability (e.g. 80% cpu treshold, implies ~10% Load will be shedded).
    - **Deadline-aware shedding**, rejects request with a remaining context (timeout) that is not fullfillable
    - **Cache based shedding**, if the cpu treshold is to high, we reject request that lead to a cache miss
     
