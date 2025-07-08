@@ -2,19 +2,35 @@ services:
   ch3f:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: cmd/ch3fs/docker/Dockerfile
     restart: unless-stopped
-    env_file:
-      - docker/.env
     networks:
       - kitchen
     deploy:
-      replicas: 10
+      replicas: 5
       restart_policy:
         condition: on-failure
     volumes:
       - container_storage:/storage
       - /var/run/docker.sock:/var/run/docker.sock
+
+  client:
+    build:
+      context: .
+      dockerfile: cmd/testclient/docker/Dockerfile
+    platform: linux/arm64
+    image: ch3fs-client
+    networks:
+      - kitchen
+    depends_on:
+      - ch3f
+    deploy:
+      replicas: 10
+      restart_policy:
+        condition: on-failure
+
+
+      
 volumes:
   container_storage:
     driver: local

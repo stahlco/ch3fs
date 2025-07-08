@@ -1298,6 +1298,10 @@
       <scope name="Project Files" level="ERROR" enabled="true" />
     </inspection_tool>
     <inspection_tool class="GoDfaErrorMayBeNotNil" enabled="true" level="WARNING" enabled_by_default="true">
+      <functions>
+        <function importPath="ch3fs/cmd" name="uploadRecipeToRandomReplica" />
+        <function importPath="ch3fs/cmd" name="downloadRecipeFromRandomReplica" />
+      </functions>
       <methods>
         <method importPath="ch3fs/storage" receiver="*Store" name="GetRecipe" />
       </methods>
