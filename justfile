@@ -22,9 +22,11 @@ up:
 # Spins up/ Shuts down
 scale opt x:
     if [ "{{opt}}" = "client" ]; then \
-    docker compose up --detach --scale client={{x}}; \
+    current_ch3f=$(docker compose ps ch3f --format json | wc -l); \
+    docker compose up --detach --scale client={{x}} --scale ch3f=$current_ch3f; \
     elif [ "{{opt}}" = "cluster" ]; then \
-    docker compose up --detach --scale ch3f={{x}}; \
+    current_client=$(docker compose ps client --format json | wc -l); \
+    docker compose up --detach --scale ch3f={{x}} --scale client=$current_client; \
     fi
 
 
