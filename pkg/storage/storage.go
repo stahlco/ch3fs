@@ -44,8 +44,14 @@ func NewRecipe(id uuid.UUID, filename string, content string) *Recipe {
 	}
 }
 
-// StoreRecipe saves the given Recipe into the BoltDB database.
-// The Recipe is marshaled into JSON before being stored under its UUID key.
+// StoreRecipe stores a given Recipe object in the underlying BoltDB database.
+//
+// Parameters:
+//   - ctx: context used to support cancellation.
+//   - recipe: pointer to the Recipe struct to store.
+//
+// Returns:
+//   - error: nil if successful; otherwise, an error describing the failure.
 func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
 	return s.Database.Update(func(tx *bbolt.Tx) error {
 		select {
@@ -70,11 +76,15 @@ func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
 	})
 }
 
-func (s *Store) UpdateRecipe(ctx context.Context, recipe *Recipe) error {
-	return nil
-}
-
-// GetRecipe retrieves a Recipe from the BoltDB database using the provided UUID.
+// GetRecipe retrieves a Recipe from the BoltDB store using its UUID.
+//
+// Parameters:
+//   - ctx: context used to support cancellation.
+//   - id: UUID of the recipe to retrieve.
+//
+// Returns:
+//   - *Recipe: pointer to the retrieved Recipe object, or nil if not found.
+//   - error: nil if successful, or an error describing what went wrong.
 func (s *Store) GetRecipe(ctx context.Context, id uuid.UUID) (*Recipe, error) {
 	var recipe Recipe
 
@@ -104,28 +114,4 @@ func (s *Store) GetRecipe(ctx context.Context, id uuid.UUID) (*Recipe, error) {
 	}
 
 	return &recipe, err
-}
-
-func (s *Store) RecipeExists(ctx context.Context, id uuid.UUID) (bool, error) {
-	var exists bool
-
-	err := s.Database.View(func(tx *bbolt.Tx) error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		bucket := tx.Bucket([]byte("recipes"))
-		if bucket == nil {
-			return fmt.Errorf("bucket recipes not found")
-		}
-
-		// id[:] converts the UUID into []byte
-		data := bucket.Get(id[:])
-		exists = data != nil
-		return nil
-	})
-
-	return exists, err
 }
