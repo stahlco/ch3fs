@@ -1,7 +1,7 @@
 package main
 
 import (
-	"ch3fs/p2p"
+	"ch3fs/pkg/cluster"
 	"context"
 	"flag"
 	"log"
@@ -15,26 +15,19 @@ var (
 func main() {
 	flag.Parse()
 
-	ml, err := DiscoverAndJoinPeers()
+	ml, err := cluster.DiscoverAndJoinPeers()
 	if err != nil {
 		log.Fatalf("failed to setup Memberlist: %v", err)
 	}
 
-	raftID := p2p.GenerateRaftID()
+	raftID := cluster.GenerateRaftID()
 	ctx := context.Background()
 
-	node, err := p2p.NewRaftWithReplicaDiscorvery(ctx, ml, raftID, ":50051")
+	node, err := cluster.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
 	if err != nil {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
 
-	// TestDummy: Testing the Functionality of the DummyFunction service!
-	//go TestDummy(list)
-
-	//TestRecipeUpload: Testing the Functionality of the RecipeUpload service!
-	//go TestUploadRecipe(list)
-
-	//Background routine which prints the memberlist
 	go func() {
 		for {
 			log.Printf("[INFO] Raft Stats: %v", node.Raft.Stats())
