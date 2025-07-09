@@ -21,7 +21,7 @@ import (
 )
 
 const CAP = 15000.0
-const GRPCPort = 8080
+const GRPCPort = ":8080"
 
 type FileServer struct {
 	pb.FileSystemServer
