@@ -10,12 +10,18 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"strconv"
 	"time"
 )
 
 var (
 	raftAddr = flag.String("address", ":50051", "TCP host+port for this node")
 )
+
+type Server struct {
+	Server  *grpc.Server
+	Service *cluster.FileServer
+}
 
 func main() {
 	flag.Parse()
@@ -41,18 +47,21 @@ func main() {
 
 	fileServer := cluster.NewFileServer(node, logger, cache)
 
-	//starting gRPC server functionality, enables test client to reach a node on port 8080
-	lis, err := net.Listen("tcp", ":8080")
 	grpcServer := grpc.NewServer()
-
 	pb.RegisterFileSystemServer(grpcServer, fileServer)
 
 	log.Printf("gRPC FileServer listening on :8080")
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("gRPC Serve failed: %v", err)
+	server := Server{
+		Server:  grpcServer,
+		Service: fileServer,
 	}
 
-	//Background routine which prints the memberlist
+	err = server.Start()
+	if err != nil {
+		logger.Error("Error while starting service with error, aborting", zap.Error(err))
+		return
+	}
+
 	go func() {
 		for {
 			log.Printf("[INFO] Raft Stats: %v", node.Raft.Stats())
@@ -66,4 +75,15 @@ func main() {
 
 	// waits for goroutines to determine
 	select {}
+}
+
+func (s *Server) Start() error {
+	logger := zap.L()
+	lis, err := net.Listen("tcp", strconv.Itoa(cluster.GRPCPort))
+	if err != nil {
+		logger.Error("Starting server failed", zap.Error(err))
+		return err
+	}
+	logger.Info("Starting server successful")
+	return s.Server.Serve(lis)
 }

@@ -18,7 +18,7 @@ import (
 const (
 	port            = ":8080"
 	ch3fTarget      = "ch3f" + port
-	rps             = 225
+	rps             = 150
 	testDuration    = 10 * time.Second // How long to run the benchmark
 	uploadCount     = 10
 	benchmarkClient = true
