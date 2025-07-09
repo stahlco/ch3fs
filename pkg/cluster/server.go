@@ -75,23 +75,23 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 
 	//Priority Load Shedding
 	if usage[0] > 90 {
-		fs.logger.Info("Upload Request will be shedded based on cpu treshold", zap.Float64("treshold", usage[0]), zap.Any("request", req))
+		fs.logger.Info("Upload Request will be shed based on cpu threshold", zap.Float64("threshold", usage[0]), zap.Any("request", req))
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
 	//Probablistic Load Shedding
 	if usage[0] > 80 && rand.Intn(4)%4 == 0 {
-		fs.logger.Info("Upload Request will be shedded based on cpu treshold and probablistic", zap.Float64("treshold", usage[0]))
-		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
+		fs.logger.Info("Upload Request will be shed based on probabilistic (25%)", zap.Float64("threshold", usage[0]))
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our probablistic load shedding requirements")
 	}
 
 	if usage[0] > 75 && rand.Intn(10)%10 == 0 {
-		fs.logger.Info("Upload Request will be shedded based on cpu treshold and probablistic", zap.Float64("treshold", usage[0]))
+		fs.logger.Info("Upload Request will be shed based on probabilistic (10%)", zap.Float64("threshold", usage[0]))
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
 	if usage[0] > 70 && rand.Intn(20)%20 == 0 {
-		fs.logger.Info("Upload Request will be shedded based on cpu treshold and probablistic", zap.Float64("treshold", usage[0]))
+		fs.logger.Info("Upload Request will be shed based on probabilistic (5%)", zap.Float64("threshold", usage[0]))
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
@@ -181,17 +181,17 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 
 	//Probablistic Load Shedding
 	if usage[0] > 95 && rand.Intn(4)%4 == 0 {
-		fs.logger.Info("Upload Request will be shedded based on cpu treshold and probablistic", zap.Float64("treshold", usage[0]))
+		fs.logger.Info("Download Request will be shed based on probabilistic (25%)", zap.Float64("treshold", usage[0]))
 		return &pb.RecipeDownloadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
 	if usage[0] > 90 && rand.Intn(10)%10 == 0 {
-		fs.logger.Info("Upload Request will be shedded based on cpu treshold and probablistic", zap.Float64("treshold", usage[0]))
+		fs.logger.Info("Download Request will be shed based on probabilistic (10%)", zap.Float64("treshold", usage[0]))
 		return &pb.RecipeDownloadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
 	if usage[0] > 85 && rand.Intn(20)%20 == 0 {
-		fs.logger.Info("Upload Request will be shedded based on cpu treshold and probablistic", zap.Float64("treshold", usage[0]))
+		fs.logger.Info("Download Request will be shed based on probabilistic (5%)", zap.Float64("treshold", usage[0]))
 		return &pb.RecipeDownloadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
