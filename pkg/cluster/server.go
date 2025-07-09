@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	_ "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -19,20 +21,22 @@ import (
 )
 
 const CAP = 15000.0
-const GRPCPort = 8080
+const GRPCPort = ":8080"
 
 type FileServer struct {
 	pb.FileSystemServer
 	Store  *storage.Store
 	Raft   *RaftNode
 	logger *zap.Logger
+	Cache  *lru.ARCCache //Cache, that tracks recent usage
 }
 
-func NewFileServer(raft *RaftNode, logger *zap.Logger) *FileServer {
+func NewFileServer(raft *RaftNode, logger *zap.Logger, cache *lru.ARCCache) *FileServer {
 	return &FileServer{
 		Store:  raft.Store,
 		logger: logger,
 		Raft:   raft,
+		Cache:  cache,
 	}
 }
 
@@ -63,8 +67,13 @@ func NewFileServer(raft *RaftNode, logger *zap.Logger) *FileServer {
 //   - Raft apply failures
 //   - Leader IP resolution failures
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
+	log.Printf("Received upload request")
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+
+	if req == nil {
+		return &pb.UploadResponse{Success: false}, fmt.Errorf("UploadResponse was nil")
 	}
 
 	//CPU Information for Load Shedding
@@ -95,10 +104,6 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
-	if req == nil {
-		return &pb.UploadResponse{Success: false}, fmt.Errorf("UploadResponse was nil")
-	}
-
 	if fs.Raft.Raft.State() != raft.Leader {
 
 		_, leaderId := fs.Raft.Raft.LeaderWithID()
@@ -110,7 +115,6 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 		}
 		leaderIP := leaders[0].String()
 
-		//TODO return the ip address
 		return &pb.UploadResponse{
 			Success:         false,
 			LeaderContainer: leaderIP,
@@ -133,6 +137,16 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	// response from fsm apply, can be nil or a UploadResponse
 	log.Printf("response of upload %s : %v", req.Filename, applyFuture.Response())
 	if resp, ok := applyFuture.Response().(*pb.UploadResponse); ok {
+
+		id, err := uuid.Parse(req.Id)
+		if err != nil {
+			fs.logger.Error("Failed to parse UUID", zap.Error(err))
+		}
+		fs.Cache.Add(req.Filename, storage.Recipe{
+			RecipeId: id,
+			Filename: req.Filename,
+			Content:  string(req.Content),
+		})
 		return resp, nil
 	}
 
@@ -164,6 +178,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 //   - Invalid or unparsable UUID
 //   - Recipe not found or store retrieval error
 func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
+	log.Printf("Received download request")
 	//Check for bad param
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -179,7 +194,7 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		return nil, fmt.Errorf("not able to get CPU data: %v", err)
 	}
 
-	//Probablistic Load Shedding
+	//Probabilistic Load Shedding
 	if usage[0] > 95 && rand.Intn(4)%4 == 0 {
 		fs.logger.Info("Download Request will be shed based on probabilistic (25%)", zap.Float64("treshold", usage[0]))
 		return &pb.RecipeDownloadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
@@ -202,7 +217,21 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		return nil, err
 	}
 
-	//Add Cache
+	//Checking, if the recipe is cached
+	cachedValueRaw, isInCache := fs.Cache.Get(req.RecipeId)
+	if isInCache {
+		recipe, succ := cachedValueRaw.(*storage.Recipe)
+		if succ {
+			fs.logger.Info("Successfully downloaded recipe out of cache")
+			return &pb.RecipeDownloadResponse{
+				Success:  true,
+				Filename: recipe.Filename,
+				Content:  []byte(recipe.Content),
+			}, nil
+		} else {
+			fs.logger.Error("Could not parse Recipe in cache")
+		}
+	}
 
 	//If Cache Miss, do a Load Shed -> Measure metrics again, and check the remaining time
 
@@ -211,6 +240,10 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		log.Printf("DownloadRecipe failed with %s", err)
 		return nil, err
 	}
+
+	//Adding recipe to cache
+	//if the cache is full, the least recently used is deleted automatically
+	fs.Cache.Add(recipe.RecipeId, recipe)
 
 	return &pb.RecipeDownloadResponse{
 		Success:  true,
