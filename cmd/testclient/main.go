@@ -8,9 +8,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,8 +21,8 @@ import (
 const (
 	port            = ":8080"
 	ch3fTarget      = "ch3f" + port
-	rps             = 150
-	testDuration    = 10 * time.Second // How long to run the benchmark
+	rps             = 50
+	testDuration    = 30 * time.Second // How long to run the benchmark
 	uploadCount     = 10
 	benchmarkClient = true
 )
@@ -44,8 +46,7 @@ func NewClient(logger zap.Logger) (*Client, func() error) {
 	}, conn.Close
 }
 
-var successCount int64
-var failureCount int64
+const CAP = 10000
 
 func main() {
 	logger := zap.L()
@@ -56,23 +57,23 @@ func main() {
 	client, cancel := NewClient(*logger)
 	defer cancel()
 
-	recipeNames := getFileNames(host)
-	contents := getContents()
 	var recipeIDs [uploadCount]string
 
 	// Upload initial recipes
+	backoff := 50.0
 	for i := 0; i < uploadCount; i++ {
-		time.Sleep(50 * time.Millisecond)
-		res, id, err := client.UploadRecipe(ch3fTarget, recipeNames[i], []byte(contents[i]))
-		if err != nil || res == nil {
-			log.Printf("[ERROR] Upload failed: %v", err)
-			continue
+		for {
+			time.Sleep(time.Duration(backoff) * time.Millisecond)
+			id, err := client.UploadRandomRecipe()
+			if err != nil || id == "" {
+				backoff = BackoffWithJitter(backoff)
+				continue
+			}
+			recipeIDs[i] = id
+			break
 		}
-		if !res.Success {
-			res, id, err = client.UploadRecipe(res.LeaderContainer+port, recipeNames[i], []byte(contents[i]))
-		}
-		recipeIDs[i] = id
 	}
+
 	time.Sleep(10 * time.Second)
 
 	// Start rate-limited benchmark
@@ -82,12 +83,16 @@ func main() {
 	defer ticker.Stop()
 
 	var (
-		wg           sync.WaitGroup
-		stopTime     = time.Now().Add(testDuration)
-		latencies    []time.Duration
-		latenciesMu  sync.Mutex
-		successCount int64
-		failureCount int64
+		wg                   sync.WaitGroup
+		stopTime             = time.Now().Add(testDuration)
+		downloadLatencies    []time.Duration
+		uploadLatencies      []time.Duration
+		downloadLatenciesMu  = &sync.Mutex{}
+		uploadLatenciesMu    = &sync.Mutex{}
+		successDownloadCount int64
+		failureDownloadCount int64
+		successUploadCount   int64
+		failureUploadCount   int64
 	)
 
 	for time.Now().Before(stopTime) {
@@ -97,28 +102,73 @@ func main() {
 			defer wg.Done()
 			start := time.Now()
 
-			id := recipeIDs[rand.Intn(uploadCount)]
-			res, err := client.DownloadRecipe(id)
+			randVal := rand.Float64()
 
-			duration := time.Since(start)
+			//0.5% each requests to upload a file
+			if randVal < 0.005 {
 
-			// Store latency
-			latenciesMu.Lock()
-			latencies = append(latencies, duration)
-			latenciesMu.Unlock()
+				id, err := client.UploadRandomRecipe()
 
-			// Track result
-			if err != nil || res == nil || !res.Success {
-				atomic.AddInt64(&failureCount, 1)
+				duration := time.Since(start)
+				uploadLatenciesMu.Lock()
+				uploadLatencies = append(uploadLatencies, duration)
+				uploadLatenciesMu.Unlock()
+
+				if err != nil {
+					atomic.AddInt64(&failureUploadCount, 1)
+				} else {
+					atomic.AddInt64(&successUploadCount, 1)
+					recipeIDs[rand.Intn(len(recipeIDs))] = id
+				}
+
 			} else {
-				atomic.AddInt64(&successCount, 1)
+
+				id := recipeIDs[rand.Intn(len(recipeIDs))]
+				res, err := client.DownloadRecipe(id)
+				duration := time.Since(start)
+
+				// Store latency
+				downloadLatenciesMu.Lock()
+				downloadLatencies = append(downloadLatencies, duration)
+				downloadLatenciesMu.Unlock()
+
+				// Track result
+				if err != nil || res == nil || !res.Success {
+					atomic.AddInt64(&failureDownloadCount, 1)
+				} else {
+					atomic.AddInt64(&successDownloadCount, 1)
+				}
 			}
 		}()
 	}
 
 	wg.Wait()
-	// Calculate average and 99th percentile
+	// Calculate benchmarks for download and upload
+	downloadAverage, downloadPercentile := calcBenchmarks(downloadLatenciesMu, downloadLatencies)
+	uploadAverage, uploadPercentile := calcBenchmarks(uploadLatenciesMu, uploadLatencies)
+	// Log final metrics
+	log.Println("------ DOWNLOADS ------")
+	printBenchmarks(successDownloadCount, failureDownloadCount, downloadAverage, downloadPercentile)
+	log.Println("------ UPLOADS ------")
+	printBenchmarks(successUploadCount, failureUploadCount, uploadAverage, uploadPercentile)
+
+}
+
+func printBenchmarks(successCount int64, failureCount int64,
+	average time.Duration, percentile99 time.Duration) {
+	log.Printf("[RESULT] Successful: %d | Failures: %d | Total: %d",
+		successCount, failureCount, successCount+failureCount)
+
+	log.Printf("[RESULT] Success Rate: %.2f%%",
+		float64(successCount)*100/float64(successCount+failureCount))
+
+	log.Printf("[RESULT] Average Latency: %s | 99th Percentile Latency: %s",
+		average, percentile99)
+}
+
+func calcBenchmarks(latenciesMu *sync.Mutex, latencies []time.Duration) (time.Duration, time.Duration) {
 	latenciesMu.Lock()
+
 	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
 
 	var total time.Duration
@@ -130,16 +180,24 @@ func main() {
 	percentile99 := latencies[int(float64(len(latencies))*0.99)]
 	latenciesMu.Unlock()
 
-	// Log final metrics
-	log.Printf("[RESULT] Success: %d | Failures: %d | Total: %d",
-		successCount, failureCount, successCount+failureCount)
+	return average, percentile99
+}
 
-	log.Printf("[RESULT] Success Rate: %.2f%%",
-		float64(successCount)*100/float64(successCount+failureCount))
-
-	log.Printf("[RESULT] Average Latency: %s | 99th Percentile Latency: %s",
-		average, percentile99)
-
+func (client *Client) UploadRandomRecipe() (string, error) {
+	fileName := getFileName()
+	content := getContent()
+	res, id, err := client.UploadRecipe(ch3fTarget, fileName, content)
+	if err != nil || res == nil {
+		log.Printf("[ERROR] Upload failed: %v", err)
+		return "", err
+	}
+	if !res.Success {
+		if res, id, err = client.UploadRecipe(res.LeaderContainer+port, fileName, content); err != nil || res == nil {
+			log.Printf("[ERROR] Upload to leader failed: %v", err)
+			return "", err
+		}
+	}
+	return id, nil
 }
 
 func (c *Client) UploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, string, error) {
@@ -166,32 +224,36 @@ func (c *Client) DownloadRecipe(id string) (*pb.RecipeDownloadResponse, error) {
 	return c.Client.DownloadRecipe(ctx, req)
 }
 
-func getFileNames(host string) [10]string {
-	return [10]string{
-		"chicken_wrap_" + host + ".txt",
-		"vegan_burger_" + host + ".txt",
-		"banana_pancake_" + host + ".txt",
-		"beef_tacos_" + host + ".txt",
-		"quinoa_salad_" + host + ".txt",
-		"avocado_toast_" + host + ".txt",
-		"spaghetti_carbonara_" + host + ".txt",
-		"berry_smoothie_" + host + ".txt",
-		"grilled_cheese_" + host + ".txt",
-		"pumpkin_soup_" + host + ".txt",
-	}
+var ingredients = []string{
+	"chicken", "beef", "tofu", "rice", "avocado", "cheese",
+	"salmon", "egg", "quinoa", "beans", "spinach", "mushroom",
 }
 
-func getContents() [10]string {
-	return [10]string{
-		"Chicken, wrap, salad, sauce",
-		"Plant patty, bun, lettuce, tomato",
-		"Banana, oats, egg, milk",
-		"Beef, taco shell, salsa, cheese",
-		"Quinoa, tomato, cucumber, olive oil",
-		"Avocado, toast, chili flakes",
-		"Pasta, egg, bacon, cheese",
-		"Berries, banana, yogurt, honey",
-		"Bread, cheese, butter",
-		"Pumpkin, onion, cream, spices",
+var meals = []string{
+	"wrap", "bowl", "burger", "pasta", "salad", "soup",
+	"sandwich", "stew", "taco", "pizza", "curry", "omelette",
+}
+
+var instruction = []string{
+	"cook", "stir", "bake", "until golden brown",
+}
+
+func getFileName() string {
+	return ingredients[rand.Intn(len(ingredients))] + "_" + ingredients[rand.Intn(len(ingredients))] +
+		meals[rand.Intn(len(meals))]
+}
+
+func getContent() []byte {
+	words := append(ingredients, instruction...)
+	var content []string
+
+	for i := 0; i < 12; i++ {
+		content = append(content, words[rand.Intn(len(words))])
 	}
+
+	return []byte(strings.Join(content, " "))
+}
+func BackoffWithJitter(backoff float64) float64 {
+	backoff = backoff * 2
+	return math.Min(rand.Float64()*backoff, CAP)
 }
