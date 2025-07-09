@@ -3,6 +3,7 @@ package main
 import (
 	pb "ch3fs/proto"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -24,13 +25,36 @@ const (
 	benchmarkClient = true
 )
 
+type Client struct {
+	Client pb.FileSystemClient
+	Logger *zap.Logger
+}
+
+func NewClient(logger zap.Logger) (*Client, func() error) {
+	conn, err := grpc.NewClient(ch3fTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, nil
+	}
+
+	client := pb.NewFileSystemClient(conn)
+
+	return &Client{
+		Client: client,
+		Logger: &logger,
+	}, conn.Close
+}
+
 var successCount int64
 var failureCount int64
 
 func main() {
+	logger := zap.L()
 	host, _ := os.Hostname()
-	time.Sleep(10 * time.Second)
+	time.Sleep(30 * time.Second)
 	log.Printf("[INFO] Benchmark client started on: %s", host)
+
+	client, cancel := NewClient(*logger)
+	defer cancel()
 
 	recipeNames := getFileNames(host)
 	contents := getContents()
@@ -38,13 +62,14 @@ func main() {
 
 	// Upload initial recipes
 	for i := 0; i < uploadCount; i++ {
-		res, id, err := uploadRecipe(ch3fTarget, recipeNames[i], []byte(contents[i]))
+		time.Sleep(50 * time.Millisecond)
+		res, id, err := client.UploadRecipe(ch3fTarget, recipeNames[i], []byte(contents[i]))
 		if err != nil || res == nil {
 			log.Printf("[ERROR] Upload failed: %v", err)
 			continue
 		}
 		if !res.Success {
-			res, id, err = uploadRecipe(res.LeaderContainer+port, recipeNames[i], []byte(contents[i]))
+			res, id, err = client.UploadRecipe(res.LeaderContainer+port, recipeNames[i], []byte(contents[i]))
 		}
 		recipeIDs[i] = id
 	}
@@ -73,7 +98,7 @@ func main() {
 			start := time.Now()
 
 			id := recipeIDs[rand.Intn(uploadCount)]
-			res, err := downloadRecipe(id)
+			res, err := client.DownloadRecipe(id)
 
 			duration := time.Since(start)
 
@@ -92,7 +117,6 @@ func main() {
 	}
 
 	wg.Wait()
-
 	// Calculate average and 99th percentile
 	latenciesMu.Lock()
 	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
@@ -118,14 +142,8 @@ func main() {
 
 }
 
-func uploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, string, error) {
-	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, "", err
-	}
-	defer conn.Close()
+func (c *Client) UploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, string, error) {
 
-	client := pb.NewFileSystemClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -135,23 +153,17 @@ func uploadRecipe(target, filename string, content []byte) (*pb.UploadResponse, 
 		Filename: filename,
 		Content:  content,
 	}
-	res, err := client.UploadRecipe(ctx, req)
+	res, err := c.Client.UploadRecipe(ctx, req)
 	return res, id, err
 }
 
-func downloadRecipe(id string) (*pb.RecipeDownloadResponse, error) {
-	conn, err := grpc.NewClient(ch3fTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
+func (c *Client) DownloadRecipe(id string) (*pb.RecipeDownloadResponse, error) {
 
-	client := pb.NewFileSystemClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	req := &pb.RecipeDownloadRequest{RecipeId: id}
-	return client.DownloadRecipe(ctx, req)
+	return c.Client.DownloadRecipe(ctx, req)
 }
 
 func getFileNames(host string) [10]string {

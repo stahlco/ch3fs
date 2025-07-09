@@ -5,12 +5,18 @@ import (
 	pb "ch3fs/proto"
 	"context"
 	"flag"
+<<<<<<< Updated upstream
 	lru "github.com/hashicorp/golang-lru"
+=======
+>>>>>>> Stashed changes
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+<<<<<<< Updated upstream
 	"strconv"
+=======
+>>>>>>> Stashed changes
 	"time"
 )
 
@@ -27,6 +33,8 @@ func main() {
 	flag.Parse()
 	logger, _ := zap.NewDevelopment()
 
+	logger := zap.L()
+
 	ml, err := cluster.DiscoverAndJoinPeers()
 	if err != nil {
 		log.Fatalf("failed to setup Memberlist: %v", err)
@@ -40,6 +48,7 @@ func main() {
 		log.Fatalf("Failed to initialize Raft node: %v", err)
 	}
 
+<<<<<<< Updated upstream
 	cache, err := lru.NewARC(128)
 	if err != nil {
 		log.Fatalf("Failed to create cache: %v", err)
@@ -60,6 +69,19 @@ func main() {
 	if err != nil {
 		logger.Error("Error while starting service with error, aborting", zap.Error(err))
 		return
+=======
+	fileServer := cluster.NewFileServer(node, logger)
+
+	//starting gRPC server functionality, enables test client to reach a node on port 8080
+	lis, err := net.Listen("tcp", ":8080")
+	grpcServer := grpc.NewServer()
+
+	pb.RegisterFileSystemServer(grpcServer, fileServer)
+
+	log.Printf("gRPC FileServer listening on :8080")
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("gRPC Serve failed: %v", err)
+>>>>>>> Stashed changes
 	}
 
 	go func() {
