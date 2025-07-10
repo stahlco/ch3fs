@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/shirou/gopsutil/v3/cpu"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"log"
@@ -63,11 +64,17 @@ func main() {
 
 	go func() {
 		for {
-			log.Printf("[INFO] Raft Stats: %v", node.Raft.Stats())
-			log.Printf("[INFO] Current Memberlist: %v", ml.Members())
+			logger.Info("Raft Stats:", zap.Any("raft stats", node.Raft.Stats()))
+			logger.Info("Current Memberlist", zap.Any("memberlist", ml.Members()))
 			leaderAddr, leaderID := node.Raft.LeaderWithID()
-			log.Printf("[INFO] Current Leader: ID=%s, Addr=%s", leaderID, leaderAddr)
+			logger.Info("Current Leader", zap.Any("leaderID", leaderID), zap.Any("leader addr", leaderAddr))
+			p, err := cpu.Percent(100*time.Millisecond, false)
+			if err != nil {
+				logger.Warn("Not able to fetch cpu data", zap.Error(err))
 
+			} else {
+				logger.Info("Current CPU usage:", zap.Float64("percent:", p[0]))
+			}
 			time.Sleep(20 * time.Second)
 		}
 	}()

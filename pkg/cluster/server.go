@@ -67,7 +67,6 @@ func NewFileServer(raft *RaftNode, logger *zap.Logger, cache *lru.ARCCache) *Fil
 //   - Raft apply failures
 //   - Leader IP resolution failures
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
-	log.Printf("Received upload request")
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -178,7 +177,6 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 //   - Invalid or unparsable UUID
 //   - Recipe not found or store retrieval error
 func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
-	log.Printf("Received download request")
 	//Check for bad param
 	if err := ctx.Err(); err != nil {
 		return nil, err
