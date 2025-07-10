@@ -21,15 +21,16 @@ import (
 const (
 	port            = ":8080"
 	ch3fTarget      = "ch3f" + port
-	rps             = 50
-	testDuration    = 30 * time.Second // How long to run the benchmark
+	rps             = 100
+	testDuration    = 120 * time.Second // How long to run the benchmark
 	uploadCount     = 10
 	benchmarkClient = true
 )
 
 type Client struct {
-	Client pb.FileSystemClient
-	Logger *zap.Logger
+	Client        pb.FileSystemClient
+	Logger        *zap.Logger
+	currentLeader string
 }
 
 func NewClient(logger zap.Logger) (*Client, func() error) {
@@ -41,8 +42,9 @@ func NewClient(logger zap.Logger) (*Client, func() error) {
 	client := pb.NewFileSystemClient(conn)
 
 	return &Client{
-		Client: client,
-		Logger: &logger,
+		Client:        client,
+		Logger:        &logger,
+		currentLeader: ch3fTarget,
 	}, conn.Close
 }
 
@@ -186,15 +188,19 @@ func calcBenchmarks(latenciesMu *sync.Mutex, latencies []time.Duration) (time.Du
 func (client *Client) UploadRandomRecipe() (string, error) {
 	fileName := getFileName()
 	content := getContent()
-	res, id, err := client.UploadRecipe(ch3fTarget, fileName, content)
+	res, id, err := client.UploadRecipe(client.currentLeader, fileName, content)
 	if err != nil || res == nil {
 		log.Printf("[ERROR] Upload failed: %v", err)
 		return "", err
 	}
 	if !res.Success {
+		client.Logger.Info("Directing the request to the leader")
 		if res, id, err = client.UploadRecipe(res.LeaderContainer+port, fileName, content); err != nil || res == nil {
 			log.Printf("[ERROR] Upload to leader failed: %v", err)
 			return "", err
+		}
+		if res.Success {
+			client.currentLeader = res.LeaderContainer + port
 		}
 	}
 	return id, nil
