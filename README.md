@@ -5,6 +5,41 @@ and `Constantin Stahl` for the `TU Berlin Scalability Engineering 2025 coding ta
 ---
 ### Setup
 
+To build and run this system, please make sure you have following tools installed. To actually run this, please follow the instructions in section "Setup the System".
+
+#### Runtime Dependencies
+
+**Go Environment:** 
+   - _Go_ (I used 1.23.5)
+
+**Protocol Buffers and gRPC:**
+   - `protoc` - Required for automatic creation of `.pb.go` files
+   - `go-grpc` plugin - to generate gRPC relevant code from `.proto` files.
+     Installation:
+      ```bash
+      go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+      go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+      ```
+
+**Docker:**
+   - Docker
+   - Docker Compose
+
+**just:**
+   - `just` for build commands
+   Installation:
+   ```bash
+   #macOS
+   brew install just
+   ```
+   ```bash
+   #arch linux
+   sudo pacman -S just
+   ```
+   
+
+#### Setup the System
+
 Before starting the system, please create the `.proto` files.
 
 ```shell
