@@ -1,13 +1,18 @@
 package client
 
 import (
+	"fmt"
+	"go.uber.org/zap"
 	"math"
 	"math/rand"
+	"net"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 )
+
+const host = "ch3f"
 
 var ingredients = []string{
 	"chicken", "beef", "tofu", "rice", "avocado", "cheese",
@@ -67,4 +72,13 @@ func printBenchmarks(label string, success, failure int64, avg, p99 time.Duratio
 	c.Logger.Infof("[%s] Success: %d | Failures: %d | Total: %d", label, success, failure, total)
 	c.Logger.Infof("[%s] Success Rate: %.2f%%", label, successRate)
 	c.Logger.Infof("[%s] Avg Latency: %s | 99th %%ile Latency: %s", label, avg, p99)
+}
+
+func discoverServers(logger *zap.SugaredLogger) ([]string, error) {
+	ips, err := net.LookupHost("ch3f")
+	if err != nil {
+		logger.Errorf("Not able to fetch ips of host: %s with error: %v", host, err)
+		return nil, fmt.Errorf("not able to fetch ips from host %s with error: %v", host, err)
+	}
+	return ips, nil
 }

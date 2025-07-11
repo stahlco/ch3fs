@@ -11,11 +11,10 @@ import (
 const ch3fTarget = "ch3f:8080"
 
 func (c *Client) UploadRecipe(target string, filename string, content []byte) (*pb.UploadResponse, error) {
-	c.Logger.Infof("Sending Upload to target: %s", target)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	conn, err := grpc.NewClient(ch3fTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, nil
 	}
@@ -35,7 +34,7 @@ func (c *Client) DownloadRecipe(filename string) (*pb.RecipeDownloadResponse, er
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, err := grpc.NewClient(ch3fTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(c.RoundRobin.Next(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, nil
 	}
