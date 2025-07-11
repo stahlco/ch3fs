@@ -1,4 +1,6 @@
-![Untitled-2025-06-13-1556](https://github.com/user-attachments/assets/feea4a62-8642-4413-90c5-25ec19dec6f0)### Overview
+![Untitled-2025-06-13-1556](https://github.com/user-attachments/assets/feea4a62-8642-4413-90c5-25ec19dec6f0)
+
+### Overview
 Distributed P2P Storage System optizimed for reads of recipes. This represents the group-work of `Cedric Borchardt`, `Johannes Duschl` 
 and `Constantin Stahl` for the `TU Berlin Scalability Engineering 2025 coding task`.
 
