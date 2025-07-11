@@ -76,20 +76,12 @@ just clean
 
 Includes, all `.pb.go` files. Does not include the compiled binary.
 
-#### Scale Cluster at Runtime
-```shell
-just scale [cluster | client] <amount>
-```
-**Example:**
-Define the number of nodes, within the cluster:
-```shell
-just scale cluster 5
-```
+#### Different Number of Nodes/Clients
 
-Define the number of clients, that access the cluster (Only for stresstesting the system):
-```shell
-just scale client 25
-```
+You can easily change the amount of Nodes within the cluster, or the amount of clients stresstesting the system. Just increase or the decrease the `deploy.replica` configuration in the `docker-compose.yaml` file.
+
+The Servers, do not need any information to find other nodes and join the shared memberlist. The instanciation of the raft cluster, will happen after a few seconds, when probably all nodes have beeing recongnized by the cluster.
+
 ---
 ### Architecture
 
