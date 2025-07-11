@@ -9,10 +9,10 @@ To build and run this system, please make sure you have following tools installe
 
 #### Runtime Dependencies
 
-**Go Environment:** 
+Go Environment:
    - _Go_ (I used 1.23.5)
 
-**Protocol Buffers and gRPC:**
+Protocol Buffers and gRPC:
    - `protoc` - Required for automatic creation of `.pb.go` files
    - `go-grpc` plugin - to generate gRPC relevant code from `.proto` files.
      Installation:
@@ -21,13 +21,13 @@ To build and run this system, please make sure you have following tools installe
       go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
       ```
 
-**Docker:**
+Docker:
    - Docker
    - Docker Compose
 
-**just:**
-   - `just` for build commands
-   Installation:
+just:
+   - `just` for build commands, install like this:
+   
    ```bash
    #macOS
    brew install just
