@@ -89,6 +89,12 @@ Define the number of clients, that access the cluster (Only for stresstesting th
 ```shell
 just scale client 25
 ```
+---
+### Architecture
+
+**Architecture of a Node:**
+<img width="872" height="706" alt="image" src="https://github.com/user-attachments/assets/9e4fa4eb-9864-4867-8912-3a152795a649" />
+
 
 ---
 ### Requirements
