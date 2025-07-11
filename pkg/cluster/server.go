@@ -6,17 +6,16 @@ import (
 	"context"
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	"github.com/google/uuid"
 	_ "github.com/hashicorp/golang-lru"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/peer"
 	"log"
 	"math"
 	"math/rand"
-	"net"
 	"time"
 )
 
@@ -27,11 +26,11 @@ type FileServer struct {
 	pb.FileSystemServer
 	Store  *storage.Store
 	Raft   *RaftNode
-	logger *zap.Logger
+	logger *zap.SugaredLogger
 	Cache  *lru.ARCCache //Cache, that tracks recent usage
 }
 
-func NewFileServer(raft *RaftNode, logger *zap.Logger, cache *lru.ARCCache) *FileServer {
+func NewFileServer(raft *RaftNode, logger *zap.SugaredLogger, cache *lru.ARCCache) *FileServer {
 	return &FileServer{
 		Store:  raft.Store,
 		logger: logger,
@@ -67,6 +66,11 @@ func NewFileServer(raft *RaftNode, logger *zap.Logger, cache *lru.ARCCache) *Fil
 //   - Raft apply failures
 //   - Leader IP resolution failures
 func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
+	p, ok := peer.FromContext(ctx)
+	if ok {
+		log.Printf("Received Upload Request from client: %v, Recipe-Filename: %s", p.Addr, req.Filename)
+	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -104,30 +108,37 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	if fs.Raft.Raft.State() != raft.Leader {
-
+		// Get the leader address directly from Raft
 		_, leaderId := fs.Raft.Raft.LeaderWithID()
 
-		leaders, err := net.LookupIP(string(leaderId))
-		if err != nil || len(leaders) == 0 {
-			log.Printf("could not resolve IP for leader %s: %v", leaderId, err)
-			return &pb.UploadResponse{Success: false}, fmt.Errorf("could not resolve leader host")
+		if leaderId == "" {
+			log.Printf("No leader currently elected")
+			return &pb.UploadResponse{Success: false}, fmt.Errorf("no leader available")
 		}
-		leaderIP := leaders[0].String()
+
+		containerName := string(leaderId)
 
 		return &pb.UploadResponse{
 			Success:         false,
-			LeaderContainer: leaderIP,
+			LeaderContainer: containerName,
 		}, nil
 	}
 
+	// This node is the leader, handle the request
+	log.Printf("Processing upload request for Recipe: %s on leader node", req.Filename)
+
+	// Your existing upload logic here
+	// ...
+
 	// serializing request for raft consensus
 	data, err := proto.Marshal(req)
+	log.Printf("Marshalled Data: %s", data)
 	if err != nil {
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	// raft apply, new entry should be appended to log and replicated to every node
-	log.Printf("applying the recipe to raft: %s", req.Filename)
+	log.Printf("applying the recipe to raft with Filename: %s", req.Filename)
 	applyFuture := fs.Raft.Raft.Apply(data, 5*time.Second)
 	if err := applyFuture.Error(); err != nil {
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("raft apply failed: %w", err)
@@ -137,12 +148,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	log.Printf("response of upload %s : %v", req.Filename, applyFuture.Response())
 	if resp, ok := applyFuture.Response().(*pb.UploadResponse); ok {
 
-		id, err := uuid.Parse(req.Id)
-		if err != nil {
-			fs.logger.Error("Failed to parse UUID", zap.Error(err))
-		}
 		fs.Cache.Add(req.Filename, storage.Recipe{
-			RecipeId: id,
 			Filename: req.Filename,
 			Content:  string(req.Content),
 		})
@@ -177,6 +183,10 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 //   - Invalid or unparsable UUID
 //   - Recipe not found or store retrieval error
 func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
+	p, ok := peer.FromContext(ctx)
+	if ok {
+		log.Printf("Received Download Request from client: %v, RecipeID: %s", p.Addr, req.Filename)
+	}
 	//Check for bad param
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -208,32 +218,24 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		return &pb.RecipeDownloadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
-	//Parsing string -> UUID
-	id, err := uuid.Parse(req.GetRecipeId())
-	if err != nil {
-		fs.logger.Error("Invalid UUID received", zap.Any("uuid", id), zap.Error(err))
-		return nil, err
-	}
-
 	//Checking, if the recipe is cached
-	cachedValueRaw, isInCache := fs.Cache.Get(req.RecipeId)
+	cachedValueRaw, isInCache := fs.Cache.Get(req.Filename)
 	if isInCache {
 		recipe, succ := cachedValueRaw.(*storage.Recipe)
 		if succ {
-			fs.logger.Info("Successfully downloaded recipe out of cache")
+			log.Printf("Successfully downloaded recipe out of cache")
 			return &pb.RecipeDownloadResponse{
 				Success:  true,
 				Filename: recipe.Filename,
 				Content:  []byte(recipe.Content),
 			}, nil
 		} else {
-			fs.logger.Error("Could not parse Recipe in cache")
+			log.Printf("Could not parse Recipe in cache")
 		}
 	}
-
 	//If Cache Miss, do a Load Shed -> Measure metrics again, and check the remaining time
 
-	recipe, err := fs.Store.GetRecipe(ctx, id)
+	recipe, err := fs.Store.GetRecipe(ctx, req.Filename)
 	if err != nil {
 		log.Printf("DownloadRecipe failed with %s", err)
 		return nil, err
@@ -241,8 +243,9 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 
 	//Adding recipe to cache
 	//if the cache is full, the least recently used is deleted automatically
-	fs.Cache.Add(recipe.RecipeId, recipe)
+	fs.Cache.Add(recipe.Filename, recipe)
 
+	log.Printf("Returning Recipe %s(%v) to %s with Content: %s", recipe.Filename, recipe.Filename, p.String(), recipe.Content)
 	return &pb.RecipeDownloadResponse{
 		Success:  true,
 		Filename: recipe.Filename,

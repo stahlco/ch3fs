@@ -2,43 +2,45 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"go.etcd.io/bbolt"
-	"log"
+	"go.uber.org/zap"
 	"os"
 	"time"
 )
 
 type Store struct {
 	Database *bbolt.DB
+	logger   *zap.SugaredLogger
+	bucket   string
 }
 
 // NewStore constructs a new Store object based on a given Filepath to the Database file (Single .db File) with a predefined FileMode (0600)
 func NewStore(path string, fileMode os.FileMode) *Store {
 	db, err := bbolt.Open(path, fileMode, &bbolt.Options{Timeout: 1 * time.Second})
+	logger := zap.S()
 	if err != nil {
-		log.Fatalf("Opening the Database on Path: %s with FileMode: %v failed. Error: %v", path, fileMode, err)
+
+		logger.Fatalf("Opening the Database on Path: %s with FileMode: %v failed. Error: %v", path, fileMode, err)
 		return nil
 	}
+	logger.Info("Successfully created Database with name", path)
 
-	log.Printf("[INFO] Successfully created Database with name: %s", path)
 	return &Store{
 		Database: db,
+		logger:   logger,
+		bucket:   "recipes",
 	}
 }
 
 // Recipe represents a Cooking Recipe which is stored in the Database and broadcasted through the system.
 type Recipe struct {
-	RecipeId uuid.UUID
 	Filename string
 	Content  string
 }
 
-func NewRecipe(id uuid.UUID, filename string, content string) *Recipe {
+func NewRecipe(filename string, content string) *Recipe {
 	return &Recipe{
-		RecipeId: id,
 		Filename: filename,
 		Content:  content,
 	}
@@ -60,19 +62,25 @@ func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
 		default:
 		}
 
-		b, err := tx.CreateBucketIfNotExists([]byte("recipes"))
+		b, err := tx.CreateBucketIfNotExists([]byte(s.bucket))
 		if err != nil {
-			log.Fatalf("Error occured when Creating/Accessing the Bucket with Error: %v", err)
 			return err
 		}
 
-		content, err := json.Marshal(recipe)
-		if err != nil {
-			log.Fatalf("Converting Recipe to JSON failed with Error: %v", err)
+		// Store the recipe
+		key := []byte(recipe.Filename)
+		value := []byte(recipe.Content)
+
+		s.logger.Infof("Storing with key: '%s' (length: %d)", recipe.Filename, len(key))
+		s.logger.Infof("Storing with value length: %d", len(value))
+
+		if err := b.Put(key, value); err != nil {
+			s.logger.Errorf("Error storing recipe with key: %s, error: %v", recipe.Filename, err)
 			return err
 		}
 
-		return b.Put(recipe.RecipeId[:], content)
+		s.logger.Infof("Successfully stored recipe with key: '%s'", recipe.Filename)
+		return nil
 	})
 }
 
@@ -85,9 +93,9 @@ func (s *Store) StoreRecipe(ctx context.Context, recipe *Recipe) error {
 // Returns:
 //   - *Recipe: pointer to the retrieved Recipe object, or nil if not found.
 //   - error: nil if successful, or an error describing what went wrong.
-func (s *Store) GetRecipe(ctx context.Context, id uuid.UUID) (*Recipe, error) {
+func (s *Store) GetRecipe(ctx context.Context, filename string) (*Recipe, error) {
+	s.logger.Infof("Starting to get recipe with UUID: %v", filename)
 	var recipe Recipe
-
 	err := s.Database.View(func(tx *bbolt.Tx) error {
 		select {
 		case <-ctx.Done():
@@ -95,18 +103,23 @@ func (s *Store) GetRecipe(ctx context.Context, id uuid.UUID) (*Recipe, error) {
 		default:
 		}
 
-		b := tx.Bucket([]byte("recipes"))
+		b := tx.Bucket([]byte(s.bucket))
 		if b == nil {
 			return fmt.Errorf("bucket: recipes not found")
 		}
+		s.logger.Infof("Fetched Bucket for name: %s, %v", filename, b.String())
 
-		// id[:] converts the UUID into []byte
-		rawData := b.Get(id[:])
+		rawData := b.Get([]byte(filename))
 		if rawData == nil {
+			s.logger.Warnf("Got no rawData from the Database for Filename: %s", filename)
 			return nil
 		}
 
-		return json.Unmarshal(rawData, &recipe)
+		data := string(rawData)
+		recipe.Filename = filename
+		recipe.Content = data
+
+		return nil
 	})
 
 	if err != nil {

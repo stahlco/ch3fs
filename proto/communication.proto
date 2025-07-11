@@ -3,36 +3,18 @@ syntax = "proto3";
 option go_package = "github.com/stahlco/ch3fs/proto";
 
 service FileSystem {
-  // Dummy Function ≈ echo + "Receiver Server"
-  rpc DummyTest (DummyTestRequest) returns (DummyTestResponse);
-
   // Upload Full File (~ 1MB large File)
   rpc UploadRecipe (RecipeUploadRequest) returns (UploadResponse);
-
-  // Upload stream for larger Files (multi-MB large files)
-  rpc UploadRecipeStream (stream RecipeChunk) returns (UploadResponse);
 
   // Download Full File (~ 1MB large Files)
   rpc DownloadRecipe (RecipeDownloadRequest) returns (RecipeDownloadResponse);
 
-  // Download stream for larger Files (multi-MB large files)
-  rpc DownloadRecipeStream (RecipeDownloadRequest) returns (stream RecipeChunk);
-
-  rpc UpdateRecipe (RecipeUpdateRequest) returns (UpdateResponse);
 }
 
-message DummyTestRequest {
-  string msg = 1;
-}
-
-message DummyTestResponse {
-  string msg = 1;
-}
 
 message RecipeUploadRequest {
-  string id = 1;
-  string filename = 2;
-  bytes content = 3;
+  string filename = 1;
+  bytes content = 2;
 }
 
 message UploadResponse {
@@ -46,20 +28,11 @@ message RecipeChunk {
 }
 
 message RecipeDownloadRequest {
-  string recipe_id = 1;
+  string filename = 1;
 }
 
 message RecipeDownloadResponse {
   bool success = 1;
   string filename = 2;
   bytes content = 3;
-}
-
-// For now only the seen list can be updated!
-message RecipeUpdateRequest {
-  string id = 1;
-}
-
-message UpdateResponse {
-  bool success = 1;
 }

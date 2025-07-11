@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v28.3.0+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hashicorp/memberlist v0.5.3
 	github.com/hashicorp/raft v1.7.3
 	github.com/hashicorp/raft-boltdb v0.0.0-20250616090010-b0f3b5d9e479
@@ -65,7 +65,6 @@ require (
 	github.com/hashicorp/go-msgpack/v2 v2.1.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.0 // indirect
-	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect

@@ -17,7 +17,7 @@ services:
   client:
     build:
       context: .
-      dockerfile: cmd/testclient/docker/Dockerfile
+      dockerfile: cmd/client/docker/Dockerfile
     platform: linux/arm64
     image: ch3fs-client
     networks:
@@ -25,7 +25,7 @@ services:
     depends_on:
       - ch3f
     deploy:
-      replicas: 10
+      replicas: 2
       restart_policy:
         condition: on-failure
 

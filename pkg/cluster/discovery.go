@@ -21,7 +21,7 @@ import (
 //   - A pointer to the initialized *memberlist.Memberlist upon successful join.
 //   - An error if DNS resolution or memberlist creation fails.
 func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
-	logger := zap.L()
+	logger := zap.S()
 
 	list, err := memberlist.Create(memberlist.DefaultLANConfig())
 	if err != nil {
@@ -29,8 +29,7 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 		return nil, err
 	}
 
-	logger.Info("Node started:", zap.String("local name", list.LocalNode().Name), zap.String("memberlist_addr", list.LocalNode().Address()))
-
+	logger.Info("Node started: %v, %v", zap.String("local name", list.LocalNode().Name), zap.String("memberlist_addr", list.LocalNode().Address()))
 	backoff := 50.0
 
 	// Joining the cluster
@@ -38,13 +37,13 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 		//Docker's Internal DNS Service - returns IPs of all healthy containers in the 'ch3fs' network
 		peerIPs, err := net.LookupHost("ch3f")
 		if err != nil {
-			logger.Fatal("Look up of host in 'ch3fs' failed", zap.Error(err))
+			logger.Errorf("Look up of host in 'ch3fs' failed %v", err)
 			return nil, err
 		}
 		if len(peerIPs) > 0 {
 			n, err := list.Join(peerIPs)
 			if err == nil {
-				logger.Info("Successfully joint nodes", zap.Int("size", n))
+				logger.Infof("Successfully joint nodes: %d", n)
 				return list, nil
 			}
 		}

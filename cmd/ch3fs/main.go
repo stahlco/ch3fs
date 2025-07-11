@@ -9,7 +9,6 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"log"
 	"net"
 	"time"
 )
@@ -25,11 +24,12 @@ type Server struct {
 
 func main() {
 	flag.Parse()
-	logger, _ := zap.NewDevelopment()
+	logger := zap.S()
 
 	ml, err := cluster.DiscoverAndJoinPeers()
 	if err != nil {
-		log.Fatalf("failed to setup Memberlist: %v", err)
+		logger.Errorf("failed to setup Memberlist: %v", err)
+		return
 	}
 
 	raftID := cluster.GenerateRaftID()
@@ -37,12 +37,14 @@ func main() {
 
 	node, err := cluster.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
 	if err != nil {
-		log.Fatalf("Failed to initialize Raft node: %v", err)
+		logger.Errorf("Failed to initialize Raft node: %v", err)
+		return
 	}
 
 	cache, err := lru.NewARC(128)
 	if err != nil {
-		log.Fatalf("Failed to create cache: %v", err)
+		logger.Errorf("Failed to create cache: %v", err)
+		return
 	}
 
 	fileServer := cluster.NewFileServer(node, logger, cache)
@@ -50,7 +52,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterFileSystemServer(grpcServer, fileServer)
 
-	log.Printf("gRPC FileServer listening on :8080")
+	logger.Infof("gRPC FileServer listening on :8080")
 	server := Server{
 		Server:  grpcServer,
 		Service: fileServer,
@@ -58,7 +60,7 @@ func main() {
 
 	err = server.Start()
 	if err != nil {
-		logger.Error("Error while starting service with error, aborting", zap.Error(err))
+		logger.Errorf("Error while starting service with error: %v aborting", err)
 		return
 	}
 

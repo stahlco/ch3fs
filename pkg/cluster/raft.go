@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	transport "github.com/Jille/raft-grpc-transport"
-	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
 	rbolt "github.com/hashicorp/raft-boltdb"
@@ -16,6 +15,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"io"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -101,7 +101,7 @@ func NewRaftWithReplicaDiscovery(
 	}
 
 	//creating store for the persistent recipes, stored in each raftNode
-	path := filepath.Join(basePath, fmt.Sprintf("%s_bbolt1.db", raftID))
+	path := filepath.Join(basePath, fmt.Sprintf("%s_persistent.db", raftID))
 	persistentStore := storage.NewStore(path, 0600)
 
 	tm := transport.New(
@@ -162,47 +162,42 @@ type fsm struct {
 // The data is a byte[], which represents a RecipeUploadRequest
 // => we want to sent the RecipeUploadRequest inside the log.data
 func (f fsm) Apply(l *raft.Log) interface{} {
-
+	log.Printf("Applying Data: %s", l.Data)
 	var request pb.RecipeUploadRequest
-	err := proto.Unmarshal(l.Data, &request)
-	if err != nil {
-		f.logger.Error("Unmarshal of log.Data failed", zap.Error(err))
-		return &pb.UploadResponse{
-			Success: false,
-		}
+	if err := proto.Unmarshal(l.Data, &request); err != nil {
+		log.Printf("Unmarshal of log.Data failed: %v", err)
+		return &pb.UploadResponse{Success: false}
 	}
-	id, err := uuid.Parse(request.Id)
-	if err != nil {
-		f.logger.Error("Invalid UUID", zap.String("id", request.Id), zap.Error(err))
-		return &pb.UploadResponse{
-			Success: false,
-		}
-	}
-	recipe := storage.NewRecipe(id, request.GetFilename(), string(request.GetContent()))
+
+	log.Printf("Unmarshalling Request successfull, Filename: %s, Content: %s", request.Filename, request.Content)
+
+	recipe := storage.NewRecipe(request.GetFilename(), string(request.GetContent()))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err = f.store.StoreRecipe(ctx, recipe)
-	if err != nil {
-		f.logger.Error("Store Recipe failed in fsm - apply", zap.Error(err))
-		return &pb.UploadResponse{
-			Success: false,
-		}
-	}
+	log.Printf("Created Recipe %v", recipe)
 
-	f.logger.Info("Successfully applied recipe", zap.String("filename", recipe.Filename))
-	return &pb.UploadResponse{
-		Success: true,
+	// Check if already stored to make it idempotent
+
+	if err := f.store.StoreRecipe(ctx, recipe); err != nil {
+		log.Printf("StoreRecipe failed in FSM Apply: %v", err)
+		return &pb.UploadResponse{Success: false}
 	}
+	if recipe, err := f.store.GetRecipe(ctx, recipe.Filename); recipe != nil && err == nil {
+		log.Printf("Successfully applied Recipe with, Filename: %s,Content: %s", recipe.Filename, recipe.Content)
+	}
+	return &pb.UploadResponse{Success: true}
 }
 
 func (f fsm) Snapshot() (raft.FSMSnapshot, error) {
+	log.Printf("Hello from Snapshot")
 	//TODO implement me
 	panic("implement me")
 }
 
 func (f fsm) Restore(snapshot io.ReadCloser) error {
+	log.Printf("Hello from Restore")
 	//TODO implement me
 	panic("implement me")
 }
