@@ -94,9 +94,10 @@ just scale client 25
 ### Architecture
 
 **Architecture of a Node:**
-![Untitled-2025-06-13-1556](https://github.com/user-attachments/assets/feea4a62-8642-4413-90c5-25ec19dec6f0)
+![Untitled-2025-06-13-1556(1)](https://github.com/user-attachments/assets/ac81144d-bb4c-4bdd-bcc2-0112191f326e)
 ---
 ### Requirements
+
 
 1. **The Application must manage some kind of state**: 
 
