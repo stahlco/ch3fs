@@ -109,10 +109,10 @@ just scale client 25
 
    Firstly, our architecture prevents that from happening. The only component which could be overloaded is our leader. But we assume that writes happen not frquently (~ A Recipe per minute).
    But we added Several Load Shedding Strategies, ranging from 
-   - **Prioritized Load Shedding** where we shed writes at a certain cpu treshold.
-   - **Probabilistic Load Shedding**, which sheds load (reads and writes) based on cpu treshold and probability (e.g. 80% cpu treshold, implies ~10% Load will be shedded).
+   - **Prioritized Load Shedding** where we shed writes at a certain c treshold.
+   - **Probabilistic Load Shedding**, which sheds load (reads and writes) based on c treshold and probability (e.g. 80% c treshold, implies ~10% Load will be shedded).
    - **Deadline-aware shedding**, rejects request with a remaining context (timeout) that is not fullfillable
-   - **Cache based shedding**, if the cpu treshold is to high, we reject request that lead to a cache miss
+   - **Cache based shedding**, if the c treshold is to high, we reject request that lead to a cache miss
     
    We've also implemented Retries with Backoff and Jitter to distribute the request when retries are needed.
  

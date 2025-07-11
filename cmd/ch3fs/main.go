@@ -2,6 +2,8 @@ package main
 
 import (
 	"ch3fs/pkg/cluster"
+	"ch3fs/pkg/cluster/download"
+	"ch3fs/pkg/cluster/upload"
 	pb "ch3fs/proto"
 	"context"
 	"flag"
@@ -26,6 +28,7 @@ func main() {
 	flag.Parse()
 	logger := zap.S()
 
+	// Memberlist Discovery - Dynamically discover peers via gossiping
 	ml, err := cluster.DiscoverAndJoinPeers()
 	if err != nil {
 		logger.Errorf("failed to setup Memberlist: %v", err)
@@ -47,7 +50,13 @@ func main() {
 		return
 	}
 
-	fileServer := cluster.NewFileServer(node, logger, cache)
+	uploadWorker := upload.NewWorker(cache, node.Store, node.Raft)
+	downloadWorker := download.NewWorker(cache, node.Store)
+
+	uploadQueue := upload.NewUploadQueue(2, uploadWorker)
+	downloadQueue := download.NewDownloadQueue(4, downloadWorker)
+
+	fileServer := cluster.NewFileServer(uploadQueue, downloadQueue, node.Raft, logger)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterFileSystemServer(grpcServer, fileServer)
@@ -86,10 +95,10 @@ func main() {
 }
 
 func (s *Server) Start() error {
-	logger := zap.L()
-	lis, err := net.Listen("tcp", cluster.GRPCPort)
+	logger := zap.S()
+	lis, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		logger.Error("Starting server failed", zap.Error(err))
+		logger.Error("Starting server failed &v", err)
 		return err
 	}
 	logger.Info("Starting server successful")

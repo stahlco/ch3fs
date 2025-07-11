@@ -36,6 +36,7 @@ type RaftNode struct {
 	Raft             *raft.Raft
 	TransportManager *transport.Manager
 	Store            *storage.Store
+	Fsm              *Fsm
 	logger           *zap.Logger
 }
 
@@ -124,7 +125,7 @@ func NewRaftWithReplicaDiscovery(
 	}()
 
 	// Might change that later
-	fsm := fsm{
+	fsm := Fsm{
 		store:  persistentStore,
 		logger: logger,
 	}
@@ -148,12 +149,13 @@ func NewRaftWithReplicaDiscovery(
 			Raft:             ra,
 			TransportManager: tm,
 			Store:            persistentStore,
+			Fsm:              &fsm,
 			logger:           logger,
 		},
 		nil
 }
 
-type fsm struct {
+type Fsm struct {
 	store  *storage.Store
 	logger *zap.Logger
 }
@@ -161,7 +163,7 @@ type fsm struct {
 // Apply This function store the accepted log of the majority of the nodes on each fsm
 // The data is a byte[], which represents a RecipeUploadRequest
 // => we want to sent the RecipeUploadRequest inside the log.data
-func (f fsm) Apply(l *raft.Log) interface{} {
+func (f Fsm) Apply(l *raft.Log) interface{} {
 	log.Printf("Applying Data: %s", l.Data)
 	var request pb.RecipeUploadRequest
 	if err := proto.Unmarshal(l.Data, &request); err != nil {
@@ -190,13 +192,13 @@ func (f fsm) Apply(l *raft.Log) interface{} {
 	return &pb.UploadResponse{Success: true}
 }
 
-func (f fsm) Snapshot() (raft.FSMSnapshot, error) {
+func (f Fsm) Snapshot() (raft.FSMSnapshot, error) {
 	log.Printf("Hello from Snapshot")
 	//TODO implement me
 	panic("implement me")
 }
 
-func (f fsm) Restore(snapshot io.ReadCloser) error {
+func (f Fsm) Restore(snapshot io.ReadCloser) error {
 	log.Printf("Hello from Restore")
 	//TODO implement me
 	panic("implement me")
