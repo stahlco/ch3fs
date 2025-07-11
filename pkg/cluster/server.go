@@ -97,15 +97,17 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our probablistic load shedding requirements")
 	}
 
-	if usage[0] > 75 && rand.Intn(10)%10 == 0 {
+	if usage[0] > 75 && usage[0] < 80 && rand.Intn(10)%10 == 0 {
 		fs.logger.Info("Upload Request will be shed based on probabilistic (10%)", zap.Float64("threshold", usage[0]))
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
-	if usage[0] > 70 && rand.Intn(20)%20 == 0 {
+	if usage[0] > 70 && usage[0] < 75 && rand.Intn(20)%20 == 0 {
 		fs.logger.Info("Upload Request will be shed based on probabilistic (5%)", zap.Float64("threshold", usage[0]))
 		return &pb.UploadResponse{Success: false}, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
+
+	//TODO: Shedding based on timeout hint
 
 	if fs.Raft.Raft.State() != raft.Leader {
 		// Get the leader address directly from Raft
