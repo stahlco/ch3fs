@@ -20,6 +20,7 @@ up:
    docker compose up --build --detach --timeout 3
 
 # Spins up/ Shuts down
+# Please don´t use it at the moment -> Can lead to bugs
 scale opt x:
     if [ "{{opt}}" = "client" ]; then \
     current_ch3f=$(docker compose ps ch3f --format json | wc -l); \

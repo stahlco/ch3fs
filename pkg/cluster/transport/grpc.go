@@ -14,7 +14,6 @@ import (
 	"log"
 	"math"
 	"math/rand"
-	"time"
 )
 
 const GRPCPort = ":8080"
@@ -72,9 +71,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	//Timeout based Load Shedding
-	//TODO: Dynamically Adjusted ProcessTime (Queue length + average process time(can be static))
-
-	if loadshed.TimeoutShedding(ctx, 1*time.Second) {
+	if loadshed.TimeoutShedding(ctx, fs.UploadQueue.EstimatedQueuingTime()) {
 		fs.logger.Info("Upload Request will be shed based on timeout hints")
 		return nil, fmt.Errorf("request been shedded based on our timeout load shedding requirements")
 	}
@@ -107,16 +104,15 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	log.Printf("Before Probabilistic Shedding")
+
+	//Load Shedding
 	if loadshed.ProbabilisticShedding(false) {
 		fs.logger.Info("Download Request will be shed based on probabilistic")
 		return nil, fmt.Errorf("request been shedded based on our probablistic load shedding requirements")
 	}
 
-	//TODO: Adjust Download Specific expected val (queue length * averageQueueTime per Request + Raw Process Time)
-	log.Printf("Before Timeout Shedding")
-	if loadshed.TimeoutShedding(ctx, 1*time.Second) {
-		fs.logger.Info("Upload Request will be shed based on timeout hints")
+	if loadshed.TimeoutShedding(ctx, fs.DownloadQueue.EstimatedQueuingTime()) {
+		fs.logger.Info("Download Request will be shed based on timeout hints")
 		return nil, fmt.Errorf("request been shedded based on our timeout load shedding requirements")
 	}
 

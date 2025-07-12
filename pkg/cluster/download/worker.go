@@ -34,7 +34,7 @@ func (w *Worker) ProcessDownloadRequest(ctx context.Context, req *pb.RecipeDownl
 		return nil, nil
 	}
 
-	if loadshed.TimeoutShedding(ctx, 200*time.Millisecond) {
+	if loadshed.TimeoutShedding(ctx, w.Estimator.Get()) {
 		w.logger.Infof("Remaining time for execution is to low, request: %s, been shed", req.Filename)
 		return nil, nil
 	}
@@ -59,11 +59,23 @@ func (w *Worker) ProcessDownloadRequest(ctx context.Context, req *pb.RecipeDownl
 	}
 
 	w.Cache.Add(recipe.Filename, recipe)
-	
+
 	w.Estimator.Update(time.Since(start))
 	return &pb.RecipeDownloadResponse{
 		Success:  true,
 		Filename: recipe.Filename,
 		Content:  []byte(recipe.Content),
 	}, nil
+}
+
+func (q *Queue) EstimatedQueuingTime() time.Duration {
+	if q.worker == nil || q.worker.Estimator == nil || q.consumer == 0 {
+		return 0
+	}
+
+	workerTime := q.worker.Estimator.Get()
+	workers := q.consumer
+
+	queueTime := float64(len(q.ch)) / float64(workers)
+	return time.Duration(queueTime * float64(workerTime))
 }

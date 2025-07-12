@@ -38,6 +38,10 @@ func NewDownloadQueue(worker *Worker) *Queue {
 	return queue
 }
 
+func (q *Queue) Len() int {
+	return len(q.ch)
+}
+
 func (q *Queue) Enqueue(j *Job) bool {
 	log.Printf("Now Enqueueing Job: %v", j.Req.Filename)
 	logger := zap.S()

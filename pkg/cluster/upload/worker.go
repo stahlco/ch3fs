@@ -35,6 +35,17 @@ func NewWorker(cache *lru.ARCCache, store *storage.Store, raftNode *raft.Raft) *
 func (w *Worker) ProcessUploadRequest(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
 	start := time.Now()
 
+	// Load Shedding
+	if loadshed.ProbabilisticShedding(true) {
+		w.logger.Infof("Upload Request for Filename: %s, been shed based on Probabilistic", req.Filename)
+		return nil, nil
+	}
+
+	if loadshed.TimeoutShedding(ctx, w.Estimator.Get()) {
+		w.logger.Infof("Upload Request for Filename: %s, been shed based on Timeout Hints", req.Filename)
+		return nil, nil
+	}
+
 	data, err := proto.Marshal(req)
 	log.Printf("Marshalled Data: %s", data)
 	if err != nil {

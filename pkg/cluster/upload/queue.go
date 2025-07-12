@@ -7,6 +7,7 @@ import (
 	mem "github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/zap"
 	"log"
+	"time"
 )
 
 type Job struct {
@@ -63,4 +64,16 @@ func (q *Queue) startWorkers() {
 			}
 		}()
 	}
+}
+
+func (q *Queue) EstimatedQueuingTime() time.Duration {
+	if q.worker == nil || q.worker.Estimator == nil || q.consumer == 0 {
+		return 0
+	}
+
+	workerTime := q.worker.Estimator.Get()
+	workers := q.consumer
+
+	queueTime := float64(len(q.ch)) / float64(workers)
+	return time.Duration(queueTime * float64(workerTime))
 }
