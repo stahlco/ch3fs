@@ -78,7 +78,7 @@ Includes, all `.pb.go` files. Does not include the compiled binary.
 
 #### Different Number of Nodes/Clients
 
-To adjust the cluster size, the amount of clients or tune even more fine garnular by adjusting the amount workers, both upload and download, within a node, you can just adjust the environment variables. Recommended values are set in the `.env.example` file.
+To adjust the cluster size, the amount of clients or tune even more fine garnular by adjusting the amount workers, both upload and download, within a node, you can adjust the environment variables. Recommended values are set in the `.env.example` file.
 
 You can also adjust the requests per second, send by each client. We also added timed load spikes, so keep that in mind.
 
