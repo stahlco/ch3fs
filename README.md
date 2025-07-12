@@ -78,9 +78,9 @@ Includes, all `.pb.go` files. Does not include the compiled binary.
 
 #### Different Number of Nodes/Clients
 
-You can easily change the amount of Nodes within the cluster, or the amount of clients stresstesting the system. Just increase or the decrease the `deploy.replica` configuration in the `docker-compose.yaml` file.
+To adjust the cluster size, the amount of clients or tune even more fine garnular by adjusting the amount workers, both upload and download, within a node, you can just adjust the environment variables. Recommended values are set in the `.env.example` file.
 
-The Servers, do not need any information to find other nodes and join the shared memberlist. The instanciation of the raft cluster, will happen after a few seconds, when probably all nodes have beeing recongnized by the cluster.
+You can also adjust the requests per second, send by each client. We also added timed load spikes, so keep that in mind.
 
 ---
 ### Architecture
