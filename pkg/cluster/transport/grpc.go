@@ -14,6 +14,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"time"
 )
 
 const GRPCPort = ":8080"
@@ -71,7 +72,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	//Timeout based Load Shedding
-	if loadshed.TimeoutShedding(ctx, fs.UploadQueue.EstimatedQueuingTime()) {
+	if loadshed.TimeoutShedding(ctx, 5*time.Second) {
 		fs.logger.Info("Upload Request will be shed based on timeout hints")
 		return nil, fmt.Errorf("request been shedded based on our timeout load shedding requirements")
 	}
@@ -111,8 +112,8 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		return nil, fmt.Errorf("request been shedded based on our probablistic load shedding requirements")
 	}
 
-	if loadshed.TimeoutShedding(ctx, fs.DownloadQueue.EstimatedQueuingTime()) {
-		fs.logger.Info("Download Request will be shed based on timeout hints")
+	if loadshed.TimeoutShedding(ctx, max(1*time.Second, fs.DownloadQueue.EstimatedQueuingTime())) {
+		log.Printf("Download Request will be shed based on timeout hints, estimated queueing time: %v", fs.DownloadQueue.EstimatedQueuingTime())
 		return nil, fmt.Errorf("request been shedded based on our timeout load shedding requirements")
 	}
 

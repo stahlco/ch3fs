@@ -6,7 +6,6 @@ import (
 	pb "ch3fs/proto"
 	"context"
 	lru "github.com/hashicorp/golang-lru"
-	"go.uber.org/zap"
 	"log"
 	"time"
 )
@@ -14,10 +13,20 @@ import (
 type Worker struct {
 	Cache     *lru.ARCCache
 	Store     *storage.Store
-	logger    *zap.SugaredLogger
 	Estimator *loadshed.Estimator
 }
 
+// NewWorker creates and returns a new Worker instances.
+//
+// Parameters:
+//
+//   - cache: Pointer to an ARC cache for recipe storage
+//
+//   - store: Pointer to the underlying storage (bbolt)
+//
+//     Returns:
+//
+//   - *Worker
 func NewWorker(cache *lru.ARCCache, store *storage.Store) *Worker {
 	e := loadshed.NewEstimator(0.1)
 	return &Worker{
@@ -27,15 +36,28 @@ func NewWorker(cache *lru.ARCCache, store *storage.Store) *Worker {
 	}
 }
 
+// ProcessDownloadRequest handles a single download request.
+// It applies load shedding as a second protection layer behind the queue to have a better control on the node stability.
+// Then it will check the cache, and if a miss happens, it will check the storage.
+// The processing time is tracked using a latency estimator, which is not working perfectly.
+//
+// Parameters:
+//   - ctx: context (timeout) used to manage deadlines.
+//   - req: pointer to the RecipeDownloadRequest message from the Job in the Queue
+//
+// Returns:
+//   - *pb.RecipeDownloadResponse: the result of the download request
+//   - error: if an error occurs during download or storage access
 func (w *Worker) ProcessDownloadRequest(ctx context.Context, req *pb.RecipeDownloadRequest) (*pb.RecipeDownloadResponse, error) {
 	start := time.Now()
+
 	if loadshed.ProbabilisticShedding(false) {
-		w.logger.Infof("Download Request for Filename: %s, been shed based on Probabilistic", req.Filename)
+		log.Printf("Download Request for Filename: %s, been shed based on Probabilistic", req.Filename)
 		return nil, nil
 	}
 
-	if loadshed.TimeoutShedding(ctx, w.Estimator.Get()) {
-		w.logger.Infof("Remaining time for execution is to low, request: %s, been shed", req.Filename)
+	if loadshed.TimeoutShedding(ctx, max(200*time.Millisecond, w.Estimator.Get())) {
+		log.Printf("Remaining time for execution is to low, request: %s, been shed (%v)", req.Filename, w.Estimator.Get())
 		return nil, nil
 	}
 

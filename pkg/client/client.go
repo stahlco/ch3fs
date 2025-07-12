@@ -34,7 +34,7 @@ func (c *Client) UploadRandomRecipe() (string, error) {
 	if c.currentLeader == "" {
 		c.currentLeader = c.RoundRobin.Next()
 	}
-
+	backoff := 50.0
 	for {
 		res, err := c.UploadRecipe(c.currentLeader, fileName, content)
 		if err != nil {
@@ -70,6 +70,7 @@ func (c *Client) UploadRandomRecipe() (string, error) {
 		// Even retry failed – backoff and try again
 		c.Logger.Warnf("Retry failed with leader: %s. Will backoff and try next.", newLeader)
 		c.currentLeader = c.RoundRobin.Next()
-		time.Sleep(time.Duration(BackoffWithJitter(50.0)) * time.Millisecond)
+		backoff = BackoffWithJitter(backoff)
+		time.Sleep(time.Duration(backoff) * time.Millisecond)
 	}
 }

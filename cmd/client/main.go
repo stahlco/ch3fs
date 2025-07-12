@@ -21,5 +21,7 @@ func main() {
 	logger.Sugar().Infof("Benchmark-Client: %s, starts to send requests", host)
 
 	client := c.NewClient(logger.Sugar())
+	//client.ShowSharedState()
+	//time.Sleep(2 * time.Second)
 	client.RunBenchmark()
 }

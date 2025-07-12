@@ -26,6 +26,14 @@ type Queue struct {
 	worker   *Worker
 }
 
+// NewDownloadQueue initializes and returns a new instance of Queue.
+// It creates a buffered channel and starts the defined number of workers (defined in .env as "DOWNLOAD_WORKER").
+//
+// Parameters:
+//   - worker: Implementation of the request processing - w.Process will be called in a goroutine
+//
+// Returns:
+//   - *Queue: Pointer to the Queue instance (Not bounded)
 func NewDownloadQueue(worker *Worker) *Queue {
 
 	queue := &Queue{
@@ -38,10 +46,14 @@ func NewDownloadQueue(worker *Worker) *Queue {
 	return queue
 }
 
-func (q *Queue) Len() int {
-	return len(q.ch)
-}
-
+// Enqueue adds a new Job to the queue for processing.
+// Queue is not bounded by a static value (e.g. 1000), it's bounded based on available virtual memory.
+//
+// Parameters:
+//   - j: Pointer to a Job (DownloadRequest) to be enqueued.
+//
+// Returns:
+//   - bool : true if the job was successfully enqueued, false otherwise
 func (q *Queue) Enqueue(j *Job) bool {
 	log.Printf("Now Enqueueing Job: %v", j.Req.Filename)
 	logger := zap.S()
@@ -58,6 +70,8 @@ func (q *Queue) Enqueue(j *Job) bool {
 	return true
 }
 
+// startWorkers starts n Worker as goroutines based on the predefined value (defined in .env).
+// A Worker will execute the Job and write the response back to the caller (gRPC endpoint).
 func (q *Queue) startWorkers() {
 	for i := 0; i < q.consumer; i++ {
 		go func() {

@@ -9,7 +9,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/hashicorp/raft"
-	"go.uber.org/zap"
 	"log"
 	"time"
 )
@@ -18,7 +17,6 @@ type Worker struct {
 	Cache     *lru.ARCCache
 	Store     *storage.Store
 	Raft      *raft.Raft
-	logger    *zap.SugaredLogger
 	Estimator *loadshed.Estimator
 }
 
@@ -37,13 +35,13 @@ func (w *Worker) ProcessUploadRequest(ctx context.Context, req *pb.RecipeUploadR
 
 	// Load Shedding
 	if loadshed.ProbabilisticShedding(true) {
-		w.logger.Infof("Upload Request for Filename: %s, been shed based on Probabilistic", req.Filename)
-		return nil, nil
+		log.Printf("Upload Request for Filename: %s, been shed based on Probabilistic", req.Filename)
+		return nil, fmt.Errorf("upload been shed based on probabilistic (worker side)")
 	}
 
-	if loadshed.TimeoutShedding(ctx, w.Estimator.Get()) {
-		w.logger.Infof("Upload Request for Filename: %s, been shed based on Timeout Hints", req.Filename)
-		return nil, nil
+	if loadshed.TimeoutShedding(ctx, 50*time.Millisecond) {
+		log.Printf("Upload Request for Filename: %s, been shed based on Timeout Hints (%v)", req.Filename, w.Estimator.Get())
+		return nil, fmt.Errorf("upload been shed based on timeout hint %v", w.Estimator.Get())
 	}
 
 	data, err := proto.Marshal(req)

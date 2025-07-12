@@ -55,11 +55,12 @@ func CoordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
 		if time.Since(start) > *discoveryTimeout {
 			logger.Fatal("Cluster is to slow, discovery timeout reached")
 		}
-
-		if len(ml.Members()) >= utils.NoLog().ParseEnvIntDefault("CLUSTER_SIZE", 5) {
+		clusterSize := utils.Log().ParseEnvIntDefault("REPLICAS", 5, logger)
+		log.Printf("Extracted Cluster size: %d", clusterSize)
+		if len(ml.Members()) >= clusterSize {
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	members := ml.Members()
