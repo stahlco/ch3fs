@@ -1,6 +1,7 @@
-package cluster
+package raft
 
 import (
+	"ch3fs/pkg/cluster/transport"
 	"github.com/hashicorp/memberlist"
 	"go.uber.org/zap"
 	"net"
@@ -47,7 +48,7 @@ func DiscoverAndJoinPeers() (*memberlist.Memberlist, error) {
 				return list, nil
 			}
 		}
-		backoff = BackoffWithJitter(backoff)
+		backoff = transport.BackoffWithJitter(backoff)
 		time.Sleep(time.Duration(backoff) * time.Millisecond)
 	}
 }

@@ -1,7 +1,8 @@
-package cluster
+package transport
 
 import (
 	"ch3fs/pkg/cluster/download"
+	"ch3fs/pkg/cluster/loadshed"
 	"ch3fs/pkg/cluster/upload"
 	pb "ch3fs/proto"
 	"context"
@@ -46,7 +47,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	// Rejecting all calls when this node is not the leader
-	b, leaderAddr, err := isLeader(fs.Raft)
+	b, leaderAddr, err := loadshed.IsLeader(fs.Raft)
 	if err != nil || !b && leaderAddr == "" {
 		return nil, fmt.Errorf("not able")
 	}
@@ -59,13 +60,13 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	}
 
 	//Priority Load Shedding
-	if PriorityShedding() {
+	if loadshed.PriorityShedding() {
 		fs.logger.Info("Upload Request will be shed based on cpu threshold")
 		return nil, fmt.Errorf("request been shedded based on our priority load shedding requirements")
 	}
 
 	//Probabilistic Load Shedding
-	if ProbabilisticShedding(true) {
+	if loadshed.ProbabilisticShedding(true) {
 		fs.logger.Info("Upload Request will be shed based on probabilistic")
 		return nil, fmt.Errorf("request been shedded based on our probablistic load shedding requirements")
 	}
@@ -73,7 +74,7 @@ func (fs *FileServer) UploadRecipe(ctx context.Context, req *pb.RecipeUploadRequ
 	//Timeout based Load Shedding
 	//TODO: Dynamically Adjusted ProcessTime (Queue length + average process time(can be static))
 
-	if TimeoutShedding(ctx, 1*time.Second) {
+	if loadshed.TimeoutShedding(ctx, 1*time.Second) {
 		fs.logger.Info("Upload Request will be shed based on timeout hints")
 		return nil, fmt.Errorf("request been shedded based on our timeout load shedding requirements")
 	}
@@ -107,14 +108,14 @@ func (fs *FileServer) DownloadRecipe(ctx context.Context, req *pb.RecipeDownload
 		return nil, err
 	}
 	log.Printf("Before Probabilistic Shedding")
-	if ProbabilisticShedding(false) {
+	if loadshed.ProbabilisticShedding(false) {
 		fs.logger.Info("Download Request will be shed based on probabilistic")
 		return nil, fmt.Errorf("request been shedded based on our probablistic load shedding requirements")
 	}
 
 	//TODO: Adjust Download Specific expected val (queue length * averageQueueTime per Request + Raw Process Time)
 	log.Printf("Before Timeout Shedding")
-	if TimeoutShedding(ctx, 1*time.Second) {
+	if loadshed.TimeoutShedding(ctx, 1*time.Second) {
 		fs.logger.Info("Upload Request will be shed based on timeout hints")
 		return nil, fmt.Errorf("request been shedded based on our timeout load shedding requirements")
 	}

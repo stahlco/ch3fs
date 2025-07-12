@@ -1,6 +1,7 @@
-package cluster
+package raft
 
 import (
+	"ch3fs/pkg/cluster/transport"
 	"context"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/raft"
+	utils "github.com/linusgith/goutils/pkg/env_utils"
 	"go.uber.org/zap"
 	"log"
 	"math/rand"
@@ -54,7 +56,7 @@ func CoordinateBootstrap(ra *raft.Raft, ml *memberlist.Memberlist) error {
 			logger.Fatal("Cluster is to slow, discovery timeout reached")
 		}
 
-		if len(ml.Members()) >= InitialClusterSize {
+		if len(ml.Members()) >= utils.NoLog().ParseEnvIntDefault("CLUSTER_SIZE", 5) {
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -174,7 +176,7 @@ func getNodeInformation(ml *memberlist.Memberlist) ([]NodeInformation, error) {
 
 	for _, c := range containers {
 		containerName := c.ID[:12]
-		if !ListContainsContainerName(ml, containerName) {
+		if !transport.ListContainsContainerName(ml, containerName) {
 			continue
 		}
 		inspect, err := cli.ContainerInspect(ctx, c.ID)

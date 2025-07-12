@@ -1,6 +1,7 @@
 package client
 
 import (
+	utils "github.com/linusgith/goutils/pkg/env_utils"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -20,6 +21,7 @@ type Spike struct {
 }
 
 func (c *Client) InitBenchmark() [uploadCount]string {
+
 	var recipeIDs [uploadCount]string
 	backoff := 50.0
 	for i := 0; i < uploadCount; i++ {
@@ -40,6 +42,7 @@ func (c *Client) InitBenchmark() [uploadCount]string {
 
 func (c *Client) RunBenchmark() {
 
+	rps := utils.NoLog().ParseEnvIntDefault("RPS", 100)
 	recipeIDs := c.InitBenchmark()
 
 	time.Sleep(10 * time.Second)
@@ -148,7 +151,7 @@ func generateClientSpikePlan(startTime time.Time) []Spike {
 		spikeStart := startTime.Add(time.Duration(base+offset) * time.Second)
 		duration := time.Duration(rand.Intn(3)+1) * time.Second // durations of spikes are [1-3s]
 		spikeEnd := spikeStart.Add(duration)
-		rps := rand.Intn(11) + 5 // rps are random between [5, 15]
+		rps := rand.Intn(500) + 100 // rps are random between [5, 15]
 
 		if spikeStart.Before(startTime) || spikeEnd.After(startTime.Add(testDuration)) {
 			continue

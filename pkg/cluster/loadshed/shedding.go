@@ -1,10 +1,11 @@
-package cluster
+package loadshed
 
 import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
 	"go.uber.org/zap"
 	"math/rand"
 	"time"
@@ -20,8 +21,17 @@ func getCpuPercent() float64 {
 	return usage[0]
 }
 
-// Before enqueuing
-func isLeader(r *raft.Raft) (bool, string, error) {
+func getDiskInformation(path string) float64 {
+	ustat, err := disk.Usage(path)
+	if err != nil {
+		return 100
+	}
+
+	return ustat.UsedPercent
+}
+
+// IsLeader will test before enqueuing request
+func IsLeader(r *raft.Raft) (bool, string, error) {
 	if r.State() == raft.Leader {
 		return true, "", nil
 	}
@@ -82,11 +92,34 @@ func probabilisticDownloadShedding() bool {
 	return false
 }
 
-// TODO: Load Shedding based on timeout hint
 func TimeoutShedding(ctx context.Context, processTime time.Duration) bool {
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		return false
 	}
 	return time.Until(deadline) < processTime
+}
+
+func CacheMissBasedShedding(dbPath string, miss bool) bool {
+	if !miss {
+		return false
+	}
+
+	c := getCpuPercent()
+
+	if c > 90 {
+		return true
+	}
+
+	return false
+}
+
+func DiskSpaceBasedShedding(dbPath string) bool {
+	d := getDiskInformation(dbPath)
+
+	if d > 90 {
+		return true
+	}
+
+	return false
 }

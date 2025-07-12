@@ -6,8 +6,10 @@ services:
     restart: unless-stopped
     networks:
       - kitchen
+    env_file:
+      - .env
     deploy:
-      replicas: 5
+      replicas: ${REPLICAS:-5}
       restart_policy:
         condition: on-failure
     volumes:
@@ -24,8 +26,10 @@ services:
       - kitchen
     depends_on:
       - ch3f
+    env_file:
+      - .env
     deploy:
-      replicas: 2
+      replicas: ${CLIENTS:-5}
       restart_policy:
         condition: on-failure
 

@@ -3,6 +3,7 @@ package download
 import (
 	pb "ch3fs/proto"
 	"context"
+	utils "github.com/linusgith/goutils/pkg/env_utils"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/zap"
 	"log"
@@ -25,10 +26,11 @@ type Queue struct {
 	worker   *Worker
 }
 
-func NewDownloadQueue(consumer int, worker *Worker) *Queue {
+func NewDownloadQueue(worker *Worker) *Queue {
+
 	queue := &Queue{
 		ch:       make(chan *Job),
-		consumer: consumer,
+		consumer: utils.NoLog().ParseEnvIntDefault("DOWNLOAD_WORKER", 10),
 		worker:   worker,
 	}
 

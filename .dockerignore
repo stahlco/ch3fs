@@ -3,7 +3,7 @@
 docker/
 valkey_conf/
 .dockerignore
-*.env*
+*.example
 .gitignore
 docker-compose.yaml
 justfile

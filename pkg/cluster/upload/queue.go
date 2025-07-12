@@ -3,6 +3,7 @@ package upload
 import (
 	pb "ch3fs/proto"
 	"context"
+	utils "github.com/linusgith/goutils/pkg/env_utils"
 	mem "github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/zap"
 	"log"
@@ -25,10 +26,10 @@ type Queue struct {
 	worker   *Worker
 }
 
-func NewUploadQueue(consumer int, w *Worker) *Queue {
+func NewUploadQueue(w *Worker) *Queue {
 	queue := &Queue{
 		ch:       make(chan *Job),
-		consumer: consumer,
+		consumer: utils.NoLog().ParseEnvIntDefault("UPLOAD_WORKER", 1),
 		worker:   w,
 	}
 

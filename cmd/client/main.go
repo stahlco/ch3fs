@@ -10,13 +10,15 @@ import (
 
 func main() {
 	logger, err := zap.NewDevelopment()
+	host, _ := os.Hostname()
+	logger.Sugar().Infof("Client %s started", host)
 	if err != nil {
 		log.Fatalf("Creating logger failed")
 		return
 	}
-	host, _ := os.Hostname()
+
 	time.Sleep(30 * time.Second)
-	logger.Sugar().Infof("Benchmark client started on: %s", host)
+	logger.Sugar().Infof("Benchmark-Client: %s, starts to send requests", host)
 
 	client := c.NewClient(logger.Sugar())
 	client.RunBenchmark()

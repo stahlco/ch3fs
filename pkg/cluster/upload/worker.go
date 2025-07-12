@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"ch3fs/pkg/cluster/loadshed"
 	"ch3fs/pkg/storage"
 	pb "ch3fs/proto"
 	"context"
@@ -14,21 +15,26 @@ import (
 )
 
 type Worker struct {
-	Cache  *lru.ARCCache
-	Store  *storage.Store
-	Raft   *raft.Raft
-	logger *zap.SugaredLogger
+	Cache     *lru.ARCCache
+	Store     *storage.Store
+	Raft      *raft.Raft
+	logger    *zap.SugaredLogger
+	Estimator *loadshed.Estimator
 }
 
 func NewWorker(cache *lru.ARCCache, store *storage.Store, raftNode *raft.Raft) *Worker {
+	e := loadshed.NewEstimator(0.1)
 	return &Worker{
-		Cache: cache,
-		Store: store,
-		Raft:  raftNode,
+		Cache:     cache,
+		Store:     store,
+		Raft:      raftNode,
+		Estimator: e,
 	}
 }
 
 func (w *Worker) ProcessUploadRequest(ctx context.Context, req *pb.RecipeUploadRequest) (*pb.UploadResponse, error) {
+	start := time.Now()
+
 	data, err := proto.Marshal(req)
 	log.Printf("Marshalled Data: %s", data)
 	if err != nil {
@@ -48,5 +54,6 @@ func (w *Worker) ProcessUploadRequest(ctx context.Context, req *pb.RecipeUploadR
 		return resp, nil
 	}
 
+	w.Estimator.Update(time.Since(start))
 	return &pb.UploadResponse{Success: false}, err
 }

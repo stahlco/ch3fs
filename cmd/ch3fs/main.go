@@ -1,8 +1,9 @@
 package main
 
 import (
-	"ch3fs/pkg/cluster"
 	"ch3fs/pkg/cluster/download"
+	"ch3fs/pkg/cluster/raft"
+	"ch3fs/pkg/cluster/transport"
 	"ch3fs/pkg/cluster/upload"
 	pb "ch3fs/proto"
 	"context"
@@ -21,7 +22,7 @@ var (
 
 type Server struct {
 	Server  *grpc.Server
-	Service *cluster.FileServer
+	Service *transport.FileServer
 }
 
 func main() {
@@ -29,16 +30,16 @@ func main() {
 	logger := zap.S()
 
 	// Memberlist Discovery - Dynamically discover peers via gossiping
-	ml, err := cluster.DiscoverAndJoinPeers()
+	ml, err := raft.DiscoverAndJoinPeers()
 	if err != nil {
 		logger.Errorf("failed to setup Memberlist: %v", err)
 		return
 	}
 
-	raftID := cluster.GenerateRaftID()
+	raftID := raft.GenerateRaftID()
 	ctx := context.Background()
 
-	node, err := cluster.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
+	node, err := raft.NewRaftWithReplicaDiscovery(ctx, ml, raftID, ":50051")
 	if err != nil {
 		logger.Errorf("Failed to initialize Raft node: %v", err)
 		return
@@ -53,10 +54,10 @@ func main() {
 	uploadWorker := upload.NewWorker(cache, node.Store, node.Raft)
 	downloadWorker := download.NewWorker(cache, node.Store)
 
-	uploadQueue := upload.NewUploadQueue(2, uploadWorker)
-	downloadQueue := download.NewDownloadQueue(4, downloadWorker)
+	uploadQueue := upload.NewUploadQueue(uploadWorker)
+	downloadQueue := download.NewDownloadQueue(downloadWorker)
 
-	fileServer := cluster.NewFileServer(uploadQueue, downloadQueue, node.Raft, logger)
+	fileServer := transport.NewFileServer(uploadQueue, downloadQueue, node.Raft, logger)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterFileSystemServer(grpcServer, fileServer)

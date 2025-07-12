@@ -1,4 +1,4 @@
-package cluster
+package raft
 
 import (
 	"ch3fs/pkg/storage"
@@ -23,8 +23,7 @@ import (
 )
 
 const (
-	RPort              = 50051
-	InitialClusterSize = 5
+	RPort = 50051
 )
 
 var (

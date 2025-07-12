@@ -1,8 +1,8 @@
 module ch3fs
 
-go 1.23.0
+go 1.24.4
 
-toolchain go1.23.5
+toolchain go1.24.5
 
 require (
 	github.com/Jille/raft-grpc-transport v1.6.1
@@ -13,10 +13,10 @@ require (
 	github.com/hashicorp/memberlist v0.5.3
 	github.com/hashicorp/raft v1.7.3
 	github.com/hashicorp/raft-boltdb v0.0.0-20250616090010-b0f3b5d9e479
+	github.com/linusgith/goutils v1.0.8
 	github.com/shirou/gopsutil/v3 v3.24.5
 	go.etcd.io/bbolt v1.4.1
 	go.uber.org/zap v1.27.0
-	golang.org/x/net v0.41.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 )
@@ -76,8 +76,9 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 )
