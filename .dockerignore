@@ -4,7 +4,7 @@ docker/
 valkey_conf/
 .dockerignore
 *.example
-*.pptx
+*.pdf
 .gitignore
 docker-compose.yaml
 justfile
