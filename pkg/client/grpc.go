@@ -30,7 +30,7 @@ func (c *Client) UploadRecipe(target string, filename string, content []byte) (*
 }
 
 func (c *Client) DownloadRecipe(filename string) (*pb.RecipeDownloadResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	conn, err := grpc.NewClient(c.RoundRobin.Next(), grpc.WithTransportCredentials(insecure.NewCredentials()))

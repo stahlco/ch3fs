@@ -169,7 +169,8 @@ func generateClientSpikePlan(startTime time.Time) []Spike {
 		spikeStart := startTime.Add(time.Duration(base+offset) * time.Second)
 		duration := time.Duration(rand.Intn(3)+1) * time.Second // durations of spikes are [1-3s]
 		spikeEnd := spikeStart.Add(duration)
-		rps := rand.Intn(50) + 50 // rps are random between [5, 15]
+		maxSpike := utils.NoLog().ParseEnvIntDefault("SPIKE_MAXIMUM", 50)
+		rps := rand.Intn(maxSpike) + 50 // rps are random between [5, 15]
 
 		if spikeStart.Before(startTime) || spikeEnd.After(startTime.Add(defaultTestDuration)) {
 			continue

@@ -22,8 +22,9 @@ type Res struct {
 
 type Queue struct {
 	ch       chan *Job
+	Cap      int
 	consumer int
-	worker   *Worker
+	Worker   *Worker
 }
 
 // NewDownloadQueue initializes and returns a new instance of Queue.
@@ -34,12 +35,13 @@ type Queue struct {
 //
 // Returns:
 //   - *Queue: Pointer to the Queue instance (Not bounded)
-func NewDownloadQueue(worker *Worker) *Queue {
+func NewDownloadQueue(len int, worker *Worker) *Queue {
 
 	queue := &Queue{
-		ch:       make(chan *Job),
+		ch:       make(chan *Job, len),
+		Cap:      len,
 		consumer: utils.NoLog().ParseEnvIntDefault("DOWNLOAD_WORKER", 10),
-		worker:   worker,
+		Worker:   worker,
 	}
 
 	queue.startWorkers()
@@ -66,8 +68,15 @@ func (q *Queue) Enqueue(j *Job) bool {
 		logger.Warnf("Low Availability of Virtual Memory, rejecting enqueing")
 		return false
 	}
-	q.ch <- j
-	return true
+	if len(q.ch) < q.Cap {
+		q.ch <- j
+		return true
+	}
+	return false
+}
+
+func (q *Queue) Len() int {
+	return len(q.ch)
 }
 
 // startWorkers starts n Worker as goroutines based on the predefined value (defined in .env).
@@ -76,7 +85,7 @@ func (q *Queue) startWorkers() {
 	for i := 0; i < q.consumer; i++ {
 		go func() {
 			for job := range q.ch {
-				resp, err := q.worker.ProcessDownloadRequest(job.Ctx, job.Req)
+				resp, err := q.Worker.ProcessDownloadRequest(job.Ctx, job.Req)
 				job.Result <- Res{Resp: resp, Err: err}
 			}
 		}()

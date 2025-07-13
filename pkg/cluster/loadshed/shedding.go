@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+// getCpuPercent returns the current system-wide CPU usage over 1 second.
+// If it fails to retrieve the data, it defaults to 100%, assuming worst-case load.
 func getCpuPercent() float64 {
 	usage, err := cpu.Percent(time.Second, false)
 	if err != nil {
@@ -21,6 +23,8 @@ func getCpuPercent() float64 {
 	return usage[0]
 }
 
+// getDiskInformation returns the percentage of disk used for the given path.
+// On error, assumes critical disk usage (100%).
 func getDiskInformation(path string) float64 {
 	ustat, err := disk.Usage(path)
 	if err != nil {
@@ -30,7 +34,8 @@ func getDiskInformation(path string) float64 {
 	return ustat.UsedPercent
 }
 
-// IsLeader will test before enqueuing request
+// IsLeader checks if the current node is the Raft leader.
+// If not, it returns the current leader's container name (if available).
 func IsLeader(r *raft.Raft) (bool, string, error) {
 	if r.State() == raft.Leader {
 		return true, "", nil
@@ -52,6 +57,8 @@ func PriorityShedding() bool {
 	return getCpuPercent() > 90
 }
 
+// ProbabilisticShedding applies a probabilistic load shedding policy based on CPU usage.
+// Upload and download requests use different thresholds and probabilities.
 func ProbabilisticShedding(upload bool) bool {
 	if upload {
 		return probabilisticUploadShedding()
@@ -60,66 +67,40 @@ func ProbabilisticShedding(upload bool) bool {
 	}
 }
 
+// probabilisticUploadShedding sheds upload requests based on CPU thresholds with varying probability.
 func probabilisticUploadShedding() bool {
-	c := getCpuPercent()
-
-	if c > 80 && rand.Intn(4)%4 == 0 {
-		return true
+	cpuLoad := getCpuPercent()
+	switch {
+	case cpuLoad > 85:
+		return rand.Intn(4) == 0
+	case cpuLoad > 75:
+		return rand.Intn(10) == 0
+	case cpuLoad > 70:
+		return rand.Intn(20) == 0
 	}
-	if c > 75 && c < 80 && rand.Intn(10)%10 == 0 {
-		return true
-	}
-	if c > 70 && c < 75 && rand.Intn(20)%20 == 0 {
-		return true
-	}
-
 	return false
 }
 
+// probabilisticDownloadShedding sheds download requests under CPU conditions.
 func probabilisticDownloadShedding() bool {
-	c := getCpuPercent()
-
-	if c > 95 && rand.Intn(4)%4 == 0 {
-		return true
+	cpuLoad := getCpuPercent()
+	switch {
+	case cpuLoad > 95:
+		return rand.Intn(4) == 0
+	case cpuLoad > 90:
+		return rand.Intn(10) == 0
+	case cpuLoad > 85:
+		return rand.Intn(20) == 0
 	}
-	if c > 90 && c < 80 && rand.Intn(10)%10 == 0 {
-		return true
-	}
-	if c > 85 && c < 75 && rand.Intn(20)%20 == 0 {
-		return true
-	}
-
 	return false
 }
 
+// TimeoutShedding sheds requests if the time remaining until the context deadline
+// is less than the estimated processing time.
 func TimeoutShedding(ctx context.Context, processTime time.Duration) bool {
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		return false
 	}
 	return time.Until(deadline) < processTime
-}
-
-func CacheMissBasedShedding(dbPath string, miss bool) bool {
-	if !miss {
-		return false
-	}
-
-	c := getCpuPercent()
-
-	if c > 90 {
-		return true
-	}
-
-	return false
-}
-
-func DiskSpaceBasedShedding(dbPath string) bool {
-	d := getDiskInformation(dbPath)
-
-	if d > 90 {
-		return true
-	}
-
-	return false
 }

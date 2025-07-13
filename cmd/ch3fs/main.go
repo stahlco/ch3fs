@@ -55,9 +55,11 @@ func main() {
 	downloadWorker := download.NewWorker(cache, node.Store)
 
 	uploadQueue := upload.NewUploadQueue(uploadWorker)
-	downloadQueue := download.NewDownloadQueue(downloadWorker)
+	downloadQueue := download.NewDownloadQueue(100, downloadWorker)
+	downloadQueues := &[]download.Queue{}
+	*downloadQueues = append(*downloadQueues, *downloadQueue)
 
-	fileServer := transport.NewFileServer(uploadQueue, downloadQueue, node.Raft, logger)
+	fileServer := transport.NewFileServer(uploadQueue, downloadQueues, node.Raft, logger)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterFileSystemServer(grpcServer, fileServer)
