@@ -8,7 +8,7 @@ and `Constantin Stahl` for the `TU Berlin Scalability Engineering 2025 coding ta
 
 To build and run this system, please make sure you have following tools installed. To actually run this, please follow the instructions in section "Setup the System".
 
-#### Runtime Dependencies
+#### Prerequisits
 
 Go Environment:
    - _Go_ (I used 1.23.5)
@@ -39,7 +39,7 @@ just:
    ```
    
 
-#### Setup the System
+#### Setup Instructions
 
 Before starting the system, please create the `.proto` files.
 
