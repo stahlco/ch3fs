@@ -1,6 +1,6 @@
 
 ### Overview
-Distributed P2P Storage System optizimed for reads of recipes. This represents the group-work of `Cedric Borchardt`, `Johannes Duschl` 
+Replicated KV Storage System optizimed for reads of recipes. This represents the group-work of `Cedric Borchardt`, `Johannes Duschl` 
 and `Constantin Stahl` for the `TU Berlin Scalability Engineering 2025 coding task`.
 
 ---
